@@ -1,0 +1,3195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Mapa 3D de Stands — Exposición Instituto Industrial Luis A. Huergo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: radial-gradient(circle at 55% 35%, #162036 0%, #0b101b 70%, #060910 100%);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #e2e8f0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+    #canvas-container:active { cursor: grabbing; }
+    #canvas-container.hover-stand { cursor: pointer; }
+
+    .safe-top {
+      padding-top: max(0.65rem, env(safe-area-inset-top));
+    }
+    .safe-bottom {
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+
+    .glass-panel {
+      background: rgba(11, 16, 27, 0.84);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(148, 163, 184, 0.20);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.50);
+    }
+
+    .floor-btn {
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      touch-action: manipulation;
+    }
+    .floor-btn:hover {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #ffffff;
+    }
+    .floor-btn.active {
+      background: rgba(14, 165, 233, 0.30);
+      border-color: rgba(56, 189, 248, 0.92);
+      color: #f0f9ff;
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.32);
+    }
+
+    .stand-list-item, .stand-chip {
+      transition: all 0.18s ease;
+      touch-action: manipulation;
+    }
+    .stand-list-item:hover, .stand-chip:hover {
+      background: rgba(148, 163, 184, 0.16);
+    }
+    .stand-list-item.active, .stand-chip.active {
+      background: rgba(30, 41, 59, 0.96);
+      box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.34), 0 6px 16px rgba(0, 0, 0, 0.38);
+    }
+
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.28); border-radius: 999px; }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    /* Capa de Etiquetas 3D Proyectadas */
+    #labels-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    /* Etiquetas Flotantes de Stands de Exposición */
+    .stand-tag-3d {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      padding: 6px 10px 6px 8px;
+      min-height: 30px;
+      border-radius: 999px;
+      background: rgba(11, 16, 27, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(148, 163, 184, 0.32);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+      pointer-events: auto;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform 0.18s ease, opacity 0.2s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      z-index: 14;
+    }
+    .stand-tag-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 190px;
+    }
+    @media (max-width: 640px) {
+      .stand-tag-3d {
+        padding: 5px 9px 5px 7px;
+        min-height: 28px;
+        font-size: 10.5px;
+      }
+      .stand-tag-label {
+        max-width: 138px;
+      }
+    }
+    .stand-tag-3d:hover {
+      transform: translate(-50%, -106%) scale(1.05);
+      border-color: rgba(255, 255, 255, 0.72);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72);
+      z-index: 24;
+    }
+    .stand-tag-3d.stand-selected {
+      transform: translate(-50%, -110%) scale(1.08);
+      z-index: 26;
+      background: rgba(15, 23, 42, 0.98);
+    }
+    .stand-tag-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-up {
+      animation: fadeSlideUp 0.22s ease-out;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Contenedor 3D -->
+  <div id="canvas-container"></div>
+  <!-- Capa de Etiquetas 3D de Stands -->
+  <div id="labels-layer"></div>
+
+  <!-- Encabezado Superior Limpio y Responsivo -->
+  <header class="fixed top-0 left-0 right-0 z-30 px-3 safe-top flex items-center justify-between gap-2 pointer-events-none">
+    <!-- Identidad del Instituto -->
+    <div class="glass-panel pointer-events-auto rounded-2xl px-3 py-2 flex items-center gap-2.5 min-w-0 max-w-[calc(100vw-8.75rem)] sm:max-w-md">
+      <div class="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-400/45 flex items-center justify-center text-sky-300 font-bold text-xs sm:text-sm shrink-0">
+        LH
+      </div>
+      <div class="min-w-0">
+        <h1 class="text-xs sm:text-sm font-semibold text-slate-100 tracking-wide leading-tight truncate">
+          <span class="sm:hidden">Luis A. Huergo</span>
+          <span class="hidden sm:inline">Instituto Industrial Luis A. Huergo</span>
+        </h1>
+        <p class="text-[10px] sm:text-[11px] text-slate-400 leading-tight truncate">
+          Exposición · Mapa 3D · Perú 759
+        </p>
+      </div>
+    </div>
+
+    <!-- Botones de Acción Rápida: Centrar Vista + Buscar Stand -->
+    <div class="flex items-center gap-1.5 pointer-events-auto shrink-0">
+      <button id="btn-reset-view" type="button" title="Centrar vista"
+        class="glass-panel rounded-xl min-w-[40px] h-10 px-2.5 text-xs font-medium text-slate-200 hover:text-white hover:border-sky-400/60 active:scale-95 transition flex items-center justify-center gap-1.5">
+        <svg class="w-4 h-4 text-sky-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4M12 9a3 3 0 100 6 3 3 0 000-6z"/>
+        </svg>
+        <span class="hidden md:inline">Centrar</span>
+      </button>
+
+      <button id="btn-toggle-search" type="button" title="Buscar stand"
+        class="glass-panel rounded-xl min-w-[40px] h-10 px-3 text-xs font-medium text-slate-200 hover:text-white hover:border-sky-400/60 active:scale-95 transition flex items-center justify-center gap-1.5">
+        <svg class="w-4 h-4 text-sky-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+        </svg>
+        <span class="hidden sm:inline">Buscar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Modal / Desplegable de Búsqueda (Ancho completo cómodo en celular, flotante en escritorio) -->
+  <div id="search-backdrop" class="hidden fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-[2px] md:bg-transparent md:backdrop-blur-none"></div>
+  <div id="search-popover" class="hidden fixed top-16 left-3 right-3 md:left-auto md:right-3 md:w-80 z-50 glass-panel rounded-2xl p-3.5 flex flex-col gap-2.5 max-h-[70dvh] animate-fade-up">
+    <div class="flex items-center gap-2">
+      <div class="relative flex-1">
+        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+        </svg>
+        <input id="stand-search" type="text" autocomplete="off" placeholder="Buscar: Química, Electrónica, Bachiller..."
+          class="w-full h-11 pl-9 pr-8 rounded-xl text-sm md:text-xs bg-slate-900/90 border border-slate-700/80 focus:border-sky-400/80 focus:outline-none text-slate-100 placeholder-slate-400 transition" />
+        <button id="btn-clear-search" type="button" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm px-1.5 py-1" title="Limpiar búsqueda">
+          ✕
+        </button>
+      </div>
+      <button id="btn-close-search" type="button"
+        class="h-11 px-3 rounded-xl text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/80 md:hidden">
+        Cerrar
+      </button>
+    </div>
+    <div id="search-results" class="space-y-1.5 overflow-y-auto custom-scroll pr-0.5 max-h-[54dvh]"></div>
+  </div>
+
+  <!-- Panel Derecho (SOLO Escritorio >= md): Stands del Piso Seleccionado -->
+  <aside id="floor-panel" class="hidden fixed top-20 right-3 z-20 w-80 max-h-[calc(100dvh-11rem)] md:flex flex-col gap-2 pointer-events-none">
+    <div id="floor-panel-card" class="hidden glass-panel pointer-events-auto rounded-2xl p-3.5 flex flex-col gap-2.5 overflow-hidden">
+      <div class="flex items-center justify-between gap-2 shrink-0">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span id="floor-panel-dot" class="w-2.5 h-2.5 rounded-full shrink-0"></span>
+            <h2 id="floor-panel-title" class="text-sm font-semibold text-white truncate">Planta Baja</h2>
+          </div>
+          <p id="floor-panel-subtitle" class="text-[11px] text-slate-400 mt-0.5">Seleccioná un stand para enfocarlo</p>
+        </div>
+        <button id="btn-collapse-floor-panel" type="button" title="Minimizar/Expandir lista"
+          class="px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition shrink-0">
+          −
+        </button>
+      </div>
+
+      <div id="floor-panel-body" class="flex flex-col gap-2.5 min-h-0">
+        <div id="floor-stands-list" class="space-y-1.5 overflow-y-auto custom-scroll pr-0.5 max-h-64"></div>
+
+        <div id="selected-stand-card" class="hidden rounded-xl bg-slate-900/85 border border-slate-700/75 p-3 space-y-2">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span id="sel-stand-swatch" class="w-3 h-3 rounded-full shrink-0"></span>
+              <h3 id="sel-stand-name" class="text-xs font-semibold text-white leading-snug">Stand</h3>
+            </div>
+            <button id="btn-deselect-stand" type="button"
+              class="px-2 py-1 rounded-lg text-[10px] font-medium bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-400/40 transition shrink-0">
+              Ver todo el piso
+            </button>
+          </div>
+          <p id="sel-stand-rooms" class="text-[11px] text-slate-300 leading-relaxed"></p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Drawer Expandible de Lista Completa para Celular (< md) -->
+  <div id="mobile-drawer-backdrop" class="hidden md:hidden fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-[2px]"></div>
+  <div id="mobile-stands-drawer" class="hidden md:hidden fixed left-3 right-3 bottom-24 z-50 glass-panel rounded-2xl p-3.5 max-h-[62dvh] flex flex-col gap-2.5 animate-fade-up">
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <span id="mobile-drawer-dot" class="w-2.5 h-2.5 rounded-full shrink-0"></span>
+        <h2 id="mobile-drawer-title" class="text-sm font-semibold text-white truncate">Stands del piso</h2>
+      </div>
+      <button id="btn-close-mobile-drawer" type="button"
+        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-300 border border-slate-700/80">
+        Cerrar
+      </button>
+    </div>
+    <div id="mobile-drawer-list" class="space-y-1.5 overflow-y-auto custom-scroll pr-0.5"></div>
+  </div>
+
+  <!-- Dock Inferior Completo: (1) Chips/Detalle Móvil + (2) Selector de Pisos -->
+  <div class="fixed bottom-0 left-0 right-0 z-30 px-2.5 sm:px-4 safe-bottom flex flex-col items-center gap-2 pointer-events-none">
+
+    <!-- Ayuda Táctil Breve (solo al inicio en celular, desaparece al tocar) -->
+    <div id="touch-hint" class="md:hidden glass-panel rounded-full px-3.5 py-1.5 text-[11px] text-slate-200 flex items-center gap-2 pointer-events-none transition-opacity duration-500">
+      <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+      <span>Elegí un piso abajo · Arrastrá para girar · Pellizcá para zoom</span>
+    </div>
+
+    <!-- Barra Contextual de Stands para Celular (< md): Chips o Ficha del Stand Seleccionado -->
+    <div id="mobile-floor-bar" class="hidden md:hidden w-full max-w-lg pointer-events-auto animate-fade-up">
+      <!-- Modo A: Carrusel de Chips del Piso Activo -->
+      <div id="mobile-chips-view" class="glass-panel rounded-2xl p-2 flex items-center gap-1.5">
+        <button id="btn-open-mobile-drawer" type="button"
+          class="shrink-0 h-10 px-2.5 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-200 text-[11px] font-semibold flex items-center gap-1.5 active:scale-95 transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/>
+          </svg>
+          <span id="mobile-drawer-count">Lista</span>
+        </button>
+        <div id="mobile-stands-chips" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 flex-1"></div>
+      </div>
+
+      <!-- Modo B: Ficha Compacta del Stand Seleccionado (con flechas anterior/siguiente) -->
+      <div id="mobile-stand-detail" class="hidden glass-panel rounded-2xl p-3 flex flex-col gap-2">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <span id="mob-stand-swatch" class="w-3.5 h-3.5 rounded-full shrink-0 border border-white/30"></span>
+            <div class="min-w-0">
+              <h3 id="mob-stand-name" class="text-xs font-semibold text-white leading-tight truncate">Stand</h3>
+              <p id="mob-stand-rooms" class="text-[11px] text-slate-300 leading-tight truncate mt-0.5">Ubicación</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1 shrink-0">
+            <button id="btn-mob-prev-stand" type="button" aria-label="Stand anterior"
+              class="w-9 h-9 rounded-xl bg-slate-800/90 active:bg-slate-700 border border-slate-700/80 text-slate-200 flex items-center justify-center text-base font-bold">
+              ‹
+            </button>
+            <button id="btn-mob-next-stand" type="button" aria-label="Siguiente stand"
+              class="w-9 h-9 rounded-xl bg-slate-800/90 active:bg-slate-700 border border-slate-700/80 text-slate-200 flex items-center justify-center text-base font-bold">
+              ›
+            </button>
+            <button id="btn-mob-deselect" type="button"
+              class="h-9 px-2.5 rounded-xl bg-sky-500/25 active:bg-sky-500/40 border border-sky-400/50 text-sky-100 text-[11px] font-semibold">
+              Ver piso
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barra Principal de Selección de Pisos (Siempre visible, 5 botones sin scroll en celular) -->
+    <nav aria-label="Selección de pisos" class="w-full max-w-lg sm:w-auto sm:max-w-full pointer-events-auto">
+      <div class="glass-panel rounded-2xl p-1.5 grid grid-cols-5 sm:flex sm:items-center gap-1 sm:gap-1.5">
+        <button type="button" data-floor="-1"
+          class="floor-btn active min-h-[46px] sm:min-h-[40px] px-1.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-medium border border-transparent text-slate-100 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+          <span class="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
+          <span class="sm:hidden leading-none">Edificio</span>
+          <span class="hidden sm:inline">Edificio Completo</span>
+        </button>
+
+        <div class="hidden sm:block w-px h-6 bg-slate-700/70 mx-0.5 shrink-0"></div>
+
+        <button type="button" data-floor="0"
+          class="floor-btn min-h-[46px] sm:min-h-[40px] px-1.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-medium border border-transparent text-slate-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-sky-300 shrink-0"></span>
+            <span class="sm:hidden text-[9px] font-mono text-slate-400">3</span>
+          </span>
+          <span class="sm:hidden leading-none">PB</span>
+          <span class="hidden sm:inline">Planta Baja</span>
+          <span class="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-800/90 text-slate-300">3</span>
+        </button>
+
+        <button type="button" data-floor="2"
+          class="floor-btn min-h-[46px] sm:min-h-[40px] px-1.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-medium border border-transparent text-slate-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+            <span class="sm:hidden text-[9px] font-mono text-slate-400">1</span>
+          </span>
+          <span class="sm:hidden leading-none">1° Piso</span>
+          <span class="hidden sm:inline">Primer Piso</span>
+          <span class="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-800/90 text-slate-300">1</span>
+        </button>
+
+        <button type="button" data-floor="3"
+          class="floor-btn min-h-[46px] sm:min-h-[40px] px-1.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-medium border border-transparent text-slate-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-lime-400 shrink-0"></span>
+            <span class="sm:hidden text-[9px] font-mono text-slate-400">3</span>
+          </span>
+          <span class="leading-none">Entrepiso</span>
+          <span class="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-800/90 text-slate-300">3</span>
+        </button>
+
+        <button type="button" data-floor="4"
+          class="floor-btn min-h-[46px] sm:min-h-[40px] px-1.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-medium border border-transparent text-slate-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+            <span class="sm:hidden text-[9px] font-mono text-slate-400">7</span>
+          </span>
+          <span class="sm:hidden leading-none">2° Piso</span>
+          <span class="hidden sm:inline">Segundo Piso</span>
+          <span class="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-800/90 text-slate-300">7</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Ayuda sutil de navegación 3D (solo escritorio) -->
+  <div class="fixed bottom-4 left-3 hidden xl:flex items-center z-10 pointer-events-none">
+    <div class="glass-panel rounded-lg px-2.5 py-1.5 text-[10px] text-slate-400 flex items-center gap-2.5">
+      <span><strong class="text-slate-200">Arrastrar:</strong> Rotar</span>
+      <span><strong class="text-slate-200">Rueda:</strong> Zoom</span>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // =========================================================================
+    // 1. CONTROLADOR DE RESPALDO CON SOPORTE TÁCTIL COMPLETO (ROTATE + PINCH)
+    // =========================================================================
+    class FallbackOrbitControls {
+      constructor(camera, domElement) {
+        this.camera = camera;
+        this.domElement = domElement;
+        this.target = new THREE.Vector3(0, 5, 0);
+        this.enableDamping = true;
+        this.dampingFactor = 0.08;
+        this.minDistance = 8;
+        this.maxDistance = 195;
+        this.maxPolarAngle = Math.PI * 0.495;
+
+        this._spherical = new THREE.Spherical();
+        this._sphericalDelta = new THREE.Spherical();
+        this._panOffset = new THREE.Vector3();
+        this._scale = 1;
+        this._state = 0; // 0 none, 1 rotate, 2 pan, 3 pinch
+        this._start = new THREE.Vector2();
+        this._pinchDist = 0;
+
+        this._onPointerDown = this._onPointerDown.bind(this);
+        this._onPointerMove = this._onPointerMove.bind(this);
+        this._onPointerUp = this._onPointerUp.bind(this);
+        this._onWheel = this._onWheel.bind(this);
+        this._onTouchStart = this._onTouchStart.bind(this);
+        this._onTouchMove = this._onTouchMove.bind(this);
+        this._onTouchEnd = this._onTouchEnd.bind(this);
+        this._onContext = (e) => e.preventDefault();
+
+        domElement.addEventListener('pointerdown', this._onPointerDown);
+        window.addEventListener('pointermove', this._onPointerMove);
+        window.addEventListener('pointerup', this._onPointerUp);
+        domElement.addEventListener('wheel', this._onWheel, { passive: false });
+        domElement.addEventListener('touchstart', this._onTouchStart, { passive: false });
+        domElement.addEventListener('touchmove', this._onTouchMove, { passive: false });
+        domElement.addEventListener('touchend', this._onTouchEnd);
+        domElement.addEventListener('contextmenu', this._onContext);
+        this.update();
+      }
+      _panBy(dx, dy) {
+        const offset = new THREE.Vector3().copy(this.camera.position).sub(this.target);
+        const dist = offset.length() * Math.tan((this.camera.fov / 2) * Math.PI / 180);
+        const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
+        const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 1);
+        this._panOffset.addScaledVector(right, -2 * dx * dist / this.domElement.clientHeight);
+        this._panOffset.addScaledVector(up, 2 * dy * dist / this.domElement.clientHeight);
+      }
+      _onPointerDown(e) {
+        if (e.pointerType === 'touch') return;
+        this._start.set(e.clientX, e.clientY);
+        this._state = (e.button === 2 || e.shiftKey) ? 2 : 1;
+      }
+      _onPointerMove(e) {
+        if (e.pointerType === 'touch' || this._state === 0) return;
+        const dx = e.clientX - this._start.x;
+        const dy = e.clientY - this._start.y;
+        this._start.set(e.clientX, e.clientY);
+        if (this._state === 1) {
+          this._sphericalDelta.theta -= (2 * Math.PI * dx) / this.domElement.clientHeight;
+          this._sphericalDelta.phi -= (2 * Math.PI * dy) / this.domElement.clientHeight;
+        } else if (this._state === 2) {
+          this._panBy(dx, dy);
+        }
+      }
+      _onPointerUp(e) {
+        if (e.pointerType === 'touch') return;
+        this._state = 0;
+      }
+      _onTouchStart(e) {
+        if (e.touches.length === 1) {
+          this._state = 1;
+          this._start.set(e.touches[0].clientX, e.touches[0].clientY);
+        } else if (e.touches.length === 2) {
+          this._state = 3;
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          this._pinchDist = Math.hypot(dx, dy);
+          this._start.set(
+            (e.touches[0].clientX + e.touches[1].clientX) * 0.5,
+            (e.touches[0].clientY + e.touches[1].clientY) * 0.5
+          );
+        }
+      }
+      _onTouchMove(e) {
+        e.preventDefault();
+        if (this._state === 1 && e.touches.length === 1) {
+          const dx = e.touches[0].clientX - this._start.x;
+          const dy = e.touches[0].clientY - this._start.y;
+          this._start.set(e.touches[0].clientX, e.touches[0].clientY);
+          this._sphericalDelta.theta -= (1.8 * Math.PI * dx) / this.domElement.clientHeight;
+          this._sphericalDelta.phi -= (1.8 * Math.PI * dy) / this.domElement.clientHeight;
+        } else if (this._state === 3 && e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          if (this._pinchDist > 10 && dist > 10) {
+            this._scale *= this._pinchDist / dist;
+          }
+          this._pinchDist = dist;
+          const midX = (e.touches[0].clientX + e.touches[1].clientX) * 0.5;
+          const midY = (e.touches[0].clientY + e.touches[1].clientY) * 0.5;
+          this._panBy(midX - this._start.x, midY - this._start.y);
+          this._start.set(midX, midY);
+        }
+      }
+      _onTouchEnd(e) {
+        if (e.touches.length === 1) {
+          this._state = 1;
+          this._start.set(e.touches[0].clientX, e.touches[0].clientY);
+        } else if (e.touches.length === 0) {
+          this._state = 0;
+        }
+      }
+      _onWheel(e) {
+        e.preventDefault();
+        this._scale *= (e.deltaY > 0) ? 1.09 : 0.92;
+      }
+      update() {
+        const offset = new THREE.Vector3().copy(this.camera.position).sub(this.target);
+        this._spherical.setFromVector3(offset);
+        this._spherical.theta += this._sphericalDelta.theta;
+        this._spherical.phi += this._sphericalDelta.phi;
+        this._spherical.phi = Math.max(0.08, Math.min(this.maxPolarAngle, this._spherical.phi));
+        this._spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this._spherical.radius * this._scale));
+        this.target.add(this._panOffset);
+        offset.setFromSpherical(this._spherical);
+        this.camera.position.copy(this.target).add(offset);
+        this.camera.lookAt(this.target);
+
+        const damp = this.enableDamping ? (1 - this.dampingFactor) : 0;
+        this._sphericalDelta.theta *= damp;
+        this._sphericalDelta.phi *= damp;
+        this._panOffset.multiplyScalar(damp);
+        this._scale = 1;
+      }
+    }
+
+    // =========================================================================
+    // 2. DATOS ARQUITECTÓNICOS DE LOS 7 NIVELES
+    // =========================================================================
+    // Sistema de coordenadas del edificio (1 unidad = 1 metro):
+    // X: 0 (Calle Perú / Oeste) -> 64 (Medianera Fondo / Este)
+    // Z: -16 (Medianera Norte) -> 0 (Eje Divisor Franjas) -> +15 (Medianera Sur)
+    // Centrado global en X = -32, Z = +0.5
+    const BLDG_OFFSET_X = -32;
+    const BLDG_OFFSET_Z = 0.5;
+    const EXPLODE_STEP_Y = 7.2;
+
+    const LEVELS_META = [
+      {
+        index: 0,
+        code: 'PB',
+        name: 'Planta Baja (3 Cotas)',
+        cota: '-1,80 / ±0,00 / +1,80 m',
+        color: '#38bdf8',
+        baseY: 0,
+        desc: 'Desarrollada en 3 cotas: acceso y hall con Escalera de Mármol (±0,00 m), corredor bajo de aulas PB-07 a PB-14 (-1,80 m) conectado por rampa central, y plataforma elevada (+1,80 m) con Rampa Norte, Gimnasio Cubierto PB-23, Cancha Descubierta, Taller Este y escalera en U hacia el Pulmón.',
+        tags: ['Escalera Mármol', 'Rampa Norte', 'Rampa Central (-1,80)', 'Gimnasio PB-23', 'Cancha Descubierta', 'Escalera en U']
+      },
+      {
+        index: 1,
+        code: 'EP s/ PB',
+        name: 'Entrepiso sobre Planta Baja',
+        cota: '+2,80 m',
+        color: '#22d3ee',
+        baseY: 2.80,
+        desc: 'Ocupa el ala Sur (EB-01 a EB-17) articulándose alrededor del vacío de doble altura de la Escalera Monumental de Mármol, con frente vidriado sobre Calle Perú y aulas laterales.',
+        tags: ['Ala Sur EB-01 a EB-17', 'Vacío Escalera Mármol (X)', 'Fachada Perú']
+      },
+      {
+        index: 2,
+        code: '1P',
+        name: 'Primer Piso',
+        cota: '+5,60 m',
+        color: '#34d399',
+        baseY: 5.60,
+        desc: 'Coronación de la Escalera de Mármol en descanso imperial (1P-02). Conecta por pasaje escalonado al gran Salón Taller 1P-32 (+ 1P-33), rodea el Bloque Central de Baños por pasillo en L y abre al Pulmón General y al Patio Descubierto con escalera exterior hacia la cancha.',
+        tags: ['Salón 1P-32 / 1P-33', 'Bloque Baños', 'Pasillo en L', 'Pulmón General', 'Patio 1° Piso', 'Escalera Exterior']
+      },
+      {
+        index: 3,
+        code: 'EP s/ 1P',
+        name: 'Entrepiso sobre Primer Piso',
+        cota: '+8,40 m',
+        color: '#a3e635',
+        baseY: 8.40,
+        desc: 'Ala Sur completa (E1-01 a E1-18) perforada por tres vacíos de doble altura (X): hall de mármol, patio de aire y luz central y gran vacío longitudinal del Pulmón General.',
+        tags: ['Salón Frente E1-01', '3 Vacíos Doble Altura (X)', 'Galerías al Pulmón']
+      },
+      {
+        index: 4,
+        code: '2P',
+        name: 'Segundo Piso',
+        cota: '+11,20 m',
+        color: '#fbbf24',
+        baseY: 11.20,
+        desc: 'Integra la cubierta plana sobre el Salón 1P-32 (dejando abierto el Patio del 1° Piso y la cancha) y el cuerpo Sur completo (2P-01 a 2P-21) con amplio salón frontal y vacío central del Pulmón.',
+        tags: ['Salón Frente 2P-01', 'Cubierta Plana s/ 1P-32', 'Vacío Pulmón (X)', 'Remate Fachada Principal']
+      },
+      {
+        index: 5,
+        code: '3P',
+        name: 'Tercer Piso',
+        cota: '+14,50 m',
+        color: '#fb923c',
+        baseY: 14.50,
+        desc: 'Volumen retraído respecto a la línea oficial de Calle Perú (3P-01 a 3P-03 con terraza delantera) que se ensancha en el sector Centro-Este (3P-04 a 3P-16) rodeando el vacío del Pulmón.',
+        tags: ['Retiro Oeste', 'Bloque Ensanchado Este', 'Vacío Pulmón (X)', 'Aulas 3P-01 a 3P-16']
+      },
+      {
+        index: 6,
+        code: 'EP s/ 3P',
+        name: 'Entrepiso sobre Tercer Piso',
+        cota: '+17,50 m',
+        color: '#f472b6',
+        baseY: 17.50,
+        desc: 'Cuerpo técnico y aulas superiores (E3-01 a E3-03) coronando el extremo Este del edificio, con galería longitudinal Oeste y escalera de acceso lateral.',
+        tags: ['Coronamiento Este', 'E3-01 a E3-03', 'Cubierta Superior']
+      }
+    ];
+
+    // Etiquetas 3D arquitectónicas de guía espacial (coordenadas locales antes de offset)
+    const SPACE_TAGS = [
+      { text: 'Calle Perú 759 · Fachada', x: -1.5, y: 7.5, z: 7.5, level: -1, gold: true },
+      { text: 'Escalera de Mármol', x: 8.5, y: 3.4, z: 7.5, level: 0, gold: true },
+      { text: 'Rampa Norte (0 → +1,80)', x: 6.5, y: 2.2, z: -8.5, level: 0 },
+      { text: 'Rampa Central (0 → -1,80)', x: 20.5, y: 0.4, z: 7.8, level: 0 },
+      { text: 'Gimnasio Cubierto PB-23', x: 27.0, y: 3.6, z: -8.0, level: 0 },
+      { text: 'Cancha Descubierta (+1,80)', x: 51.0, y: 3.0, z: -8.5, level: 0, gold: true },
+      { text: 'Escalera Ancha (-1,80 → +1,80)', x: 43.8, y: 1.5, z: 8.3, level: 0 },
+      { text: 'Escalera en U al Pulmón', x: 51.5, y: 4.3, z: 11.2, level: 0 },
+      { text: 'Salón Taller 1P-32', x: 27.5, y: 8.4, z: -8.0, level: 2, gold: true },
+      { text: 'Bloque Central de Baños', x: 33.5, y: 7.8, z: 4.2, level: 2 },
+      { text: 'Pulmón General (Doble Altura)', x: 47.5, y: 9.8, z: 7.2, level: 2, gold: true },
+      { text: 'Patio 1° Piso + Escalera Ext.', x: 45.0, y: 6.8, z: -1.8, level: 2 },
+      { text: 'Retiro 3° Piso (+14,50)', x: 21.0, y: 17.6, z: 7.5, level: 5 },
+      { text: 'EP s/ 3P (+17,50)', x: 59.0, y: 20.8, z: 7.5, level: 6 }
+    ];
+
+    // =========================================================================
+    // 3. DATOS EXACTOS DE LOS 14 STANDS DE EXPOSICIÓN (SEGÚN PLANOS COLOREADOS)
+    // =========================================================================
+    const STANDS_DATA = [
+      // --- PLANTA BAJA (level: 0) ---
+      {
+        id: 'pb-computacion',
+        level: 0,
+        floorGroup: 'Planta Baja',
+        floorCode: 'PB',
+        shortFloor: 'PB',
+        name: 'Computación',
+        rooms: 'PB-03 y PB-04 (Cota ±0,00 m)',
+        color: '#b8d45c',
+        borderColor: '#dcf584',
+        prisms: [
+          { x: 3.10, y: 0.04, z: 10.42, w: 4.30, h: 2.50, d: 4.18 },
+          { x: 7.75, y: 0.04, z: 10.42, w: 8.70, h: 2.50, d: 4.18 }
+        ],
+        labels: [
+          { x: 9.8, y: 2.75, z: 12.5, label: 'Computación' }
+        ],
+        camPos: [-34, 14, 29],
+        camTarget: [-22, 1.8, 12.5]
+      },
+      {
+        id: 'pb-quimica',
+        level: 0,
+        floorGroup: 'Planta Baja',
+        floorCode: 'PB',
+        shortFloor: 'PB',
+        name: 'Química',
+        rooms: 'PB-09, PB-11 y PB-10 (Cota -1,80 m)',
+        color: '#f08e67',
+        borderColor: '#ffc0a3',
+        prisms: [
+          { x: 24.45, y: -1.76, z: 0.45, w: 5.25, h: 4.10, d: 6.12 },
+          { x: 30.05, y: -1.76, z: 0.45, w: 7.65, h: 4.10, d: 6.12 },
+          { x: 30.05, y: -1.76, z: 9.68, w: 5.25, h: 4.10, d: 4.92 }
+        ],
+        labels: [
+          { x: 31.1, y: 2.55, z: 3.5, label: 'Química' },
+          { x: 32.7, y: 2.55, z: 12.1, label: 'Química' }
+        ],
+        camPos: [-2, 16, 30],
+        camTarget: [-1, 0.5, 7.5]
+      },
+      {
+        id: 'pb-eerr-meca-const',
+        level: 0,
+        floorGroup: 'Planta Baja',
+        floorCode: 'PB',
+        shortFloor: 'PB',
+        name: 'EERR / Meca / Construcciones',
+        rooms: 'Gimnasio Cubierto PB-23 (Cota +1,80 m)',
+        color: '#88abe8',
+        borderColor: '#bdd5ff',
+        prisms: [
+          { x: 14.0, y: 1.84, z: -15.25, w: 26.0, h: 3.10, d: 14.35 }
+        ],
+        labels: [
+          { x: 27.0, y: 5.25, z: -8.0, label: 'EERR / Meca / Construcciones' }
+        ],
+        camPos: [-8, 22, -32],
+        camTarget: [-5, 3.2, -7.5]
+      },
+
+      // --- PRIMER PISO (level: 2) ---
+      {
+        id: '1p-electronica',
+        level: 2,
+        floorGroup: 'Primer Piso',
+        floorCode: '1P',
+        shortFloor: '1P',
+        name: 'Electrónica',
+        rooms: '1P-15 y 1P-18 (Cota +5,60 m)',
+        color: '#c297de',
+        borderColor: '#e2c4f7',
+        prisms: [
+          { x: 17.30, y: 5.64, z: 11.00, w: 8.40, h: 2.50, d: 3.58 },
+          { x: 26.05, y: 5.64, z: 11.00, w: 7.65, h: 2.50, d: 3.58 }
+        ],
+        labels: [
+          { x: 25.5, y: 8.35, z: 12.8, label: 'Electrónica' }
+        ],
+        camPos: [-10, 18, 32],
+        camTarget: [-6.5, 6.8, 12.8]
+      },
+
+      // --- ENTREPISO SOBRE PRIMER PISO (level: 3) ---
+      {
+        id: 'ep1p-sociales',
+        level: 3,
+        floorGroup: 'EP s/ Primer Piso',
+        floorCode: 'EP s/ 1P',
+        shortFloor: 'EP 1P',
+        name: 'Sociales',
+        rooms: 'E1-07 (Cota +8,40 m)',
+        color: '#eee683',
+        borderColor: '#fcf6b2',
+        prisms: [
+          { x: 27.25, y: 8.44, z: 0.45, w: 7.10, h: 2.50, d: 6.90 }
+        ],
+        labels: [
+          { x: 30.8, y: 11.15, z: 3.9, label: 'Sociales' }
+        ],
+        camPos: [-2, 22, 24],
+        camTarget: [-1.2, 9.6, 4.4]
+      },
+      {
+        id: 'ep1p-lengua',
+        level: 3,
+        floorGroup: 'EP s/ Primer Piso',
+        floorCode: 'EP s/ 1P',
+        shortFloor: 'EP 1P',
+        name: 'Lengua',
+        rooms: 'E1-09 (Cota +8,40 m)',
+        color: '#9adcf5',
+        borderColor: '#cceeff',
+        prisms: [
+          { x: 34.75, y: 8.44, z: 0.45, w: 18.60, h: 2.50, d: 3.20 }
+        ],
+        labels: [
+          { x: 44.0, y: 11.15, z: 2.0, label: 'Lengua' }
+        ],
+        camPos: [16, 23, -18],
+        camTarget: [12, 9.6, 2.5]
+      },
+      {
+        id: 'ep1p-bachiller',
+        level: 3,
+        floorGroup: 'EP s/ Primer Piso',
+        floorCode: 'EP s/ 1P',
+        shortFloor: 'EP 1P',
+        name: 'Bachiller',
+        rooms: 'E1-10 (Cota +8,40 m)',
+        color: '#f09486',
+        borderColor: '#ffc2b8',
+        prisms: [
+          { x: 34.75, y: 8.44, z: 10.42, w: 13.10, h: 2.50, d: 4.18 }
+        ],
+        labels: [
+          { x: 41.3, y: 11.15, z: 12.5, label: 'Bachiller' }
+        ],
+        camPos: [12, 21, 32],
+        camTarget: [9.3, 9.6, 13.0]
+      },
+
+      // --- SEGUNDO PISO (level: 4) ---
+      {
+        id: '2p-ciclo-basico',
+        level: 4,
+        floorGroup: 'Segundo Piso',
+        floorCode: '2P',
+        shortFloor: '2P',
+        name: 'Ciclo Básico',
+        rooms: '2P-01 Salón Frontal (Cota +11,20 m)',
+        color: '#f2a583',
+        borderColor: '#ffccb5',
+        prisms: [
+          { x: 0.55, y: 11.24, z: 0.45, w: 13.30, h: 2.95, d: 14.12 }
+        ],
+        labels: [
+          { x: 7.2, y: 14.45, z: 7.5, label: 'Ciclo Básico' }
+        ],
+        camPos: [-46, 24, 28],
+        camTarget: [-24.8, 12.6, 8.0]
+      },
+      {
+        id: '2p-ficciones',
+        level: 4,
+        floorGroup: 'Segundo Piso',
+        floorCode: '2P',
+        shortFloor: '2P',
+        name: 'Ficciones inmersivas',
+        rooms: '2P-06 Oeste (Cota +11,20 m)',
+        color: '#b4d68b',
+        borderColor: '#d9f2b6',
+        prisms: [
+          { x: 23.05, y: 11.24, z: 0.45, w: 6.35, h: 2.95, d: 4.38 }
+        ],
+        labels: [
+          { x: 26.2, y: 14.45, z: 2.6, label: 'Ficciones inmersivas' }
+        ],
+        camPos: [-8, 25, -18],
+        camTarget: [-5.8, 12.6, 3.1]
+      },
+      {
+        id: '2p-computacion',
+        level: 4,
+        floorGroup: 'Segundo Piso',
+        floorCode: '2P',
+        shortFloor: '2P',
+        name: 'Computación',
+        rooms: '2P-06 Este y 2P-11 (Cota +11,20 m)',
+        color: '#919cd6',
+        borderColor: '#c2c9f5',
+        prisms: [
+          { x: 29.75, y: 11.24, z: 0.45, w: 5.65, h: 2.95, d: 4.38 },
+          { x: 35.25, y: 11.24, z: 10.22, w: 11.60, h: 2.95, d: 4.38 }
+        ],
+        labels: [
+          { x: 32.5, y: 14.45, z: 2.6, label: 'Computación' },
+          { x: 41.0, y: 14.45, z: 12.4, label: 'Computación' }
+        ],
+        camPos: [8, 25, 31],
+        camTarget: [6, 12.6, 8.0]
+      },
+      {
+        id: '2p-bachiller',
+        level: 4,
+        floorGroup: 'Segundo Piso',
+        floorCode: '2P',
+        shortFloor: '2P',
+        name: 'Bachiller',
+        rooms: '2P-10 y 2P-12 / 2P-13 (Cota +11,20 m)',
+        color: '#f5e27a',
+        borderColor: '#fff4b8',
+        prisms: [
+          { x: 35.75, y: 11.24, z: 0.45, w: 9.60, h: 2.95, d: 4.38 },
+          { x: 45.75, y: 11.24, z: 0.45, w: 7.60, h: 2.95, d: 4.38 }
+        ],
+        labels: [
+          { x: 44.5, y: 14.45, z: 2.6, label: 'Bachiller' }
+        ],
+        camPos: [16, 26, -18],
+        camTarget: [12.5, 12.6, 3.1]
+      },
+      {
+        id: '2p-mate-fisica',
+        level: 4,
+        floorGroup: 'Segundo Piso',
+        floorCode: '2P',
+        shortFloor: '2P',
+        name: 'Matemática / Física / Tec. Representación',
+        rooms: '2P-08 (Cota +11,20 m)',
+        color: '#91d6df',
+        borderColor: '#c4f0f5',
+        prisms: [
+          { x: 28.75, y: 11.24, z: 10.22, w: 6.10, h: 2.95, d: 4.38 }
+        ],
+        labels: [
+          { x: 31.8, y: 14.45, z: 12.4, label: 'Matemática / Física / Tec. Representación' }
+        ],
+        camPos: [0, 24, 32],
+        camTarget: [-0.2, 12.6, 12.9]
+      },
+      {
+        id: '2p-biologia',
+        level: 4,
+        floorGroup: 'Segundo Piso',
+        floorCode: '2P',
+        shortFloor: '2P',
+        name: 'Biología',
+        rooms: '2P-05 (Cota +11,20 m)',
+        color: '#d496c4',
+        borderColor: '#f2c4e6',
+        prisms: [
+          { x: 21.75, y: 11.24, z: 10.22, w: 6.60, h: 2.95, d: 4.38 }
+        ],
+        labels: [
+          { x: 25.0, y: 14.45, z: 12.4, label: 'Biología' }
+        ],
+        camPos: [-8, 24, 32],
+        camTarget: [-7.0, 12.6, 12.9]
+      },
+      {
+        id: '2p-escritura',
+        level: 4,
+        floorGroup: 'Segundo Piso',
+        floorCode: '2P',
+        shortFloor: '2P',
+        name: 'Taller de escritura',
+        rooms: '2P-03 (Cota +11,20 m)',
+        color: '#9ca3ad',
+        borderColor: '#d1d7e0',
+        prisms: [
+          { x: 14.45, y: 11.24, z: 10.22, w: 6.90, h: 2.95, d: 4.38 }
+        ],
+        labels: [
+          { x: 17.9, y: 14.45, z: 12.4, label: 'Taller de escritura' }
+        ],
+        camPos: [-16, 24, 32],
+        camTarget: [-14.1, 12.6, 12.9]
+      }
+    ];
+
+    // =========================================================================
+    // 4. VARIABLES GLOBALES DE ESCENA Y ESTADO UI
+    // =========================================================================
+    let scene, camera, renderer, controls, raycaster, pointer;
+    let buildingRoot, streetDetailsGroup;
+    let levelGroups = [];
+    let levelPalettes = [];
+    let clickableMeshes = [];
+    let standClickableMeshes = [];
+    let standVisuals = {}; // id -> { stand, group, bodyMat, baseMat, edgeMat }
+    let standLabelElements = [];
+    let animClock = 0;
+
+    // Solo los 4 pisos con stands son seleccionables individualmente
+    const STAND_FLOOR_INDICES = [0, 2, 3, 4];
+
+    const state = {
+      selectedLevel: -1,       // -1 = Edificio Completo | 0, 2, 3, 4 = Piso aislado
+      selectedStandId: null,   // null = todos los stands del piso activo
+      floorPanelCollapsed: false,
+      mobileDrawerOpen: false,
+      searchOpen: false,
+      camAnim: null,
+      pointerDownPos: { x: 0, y: 0 },
+      activePointers: new Set(),
+      wasMultiTouch: false,
+      hintDismissed: false
+    };
+
+    // =========================================================================
+    // 5. PALETA ARQUITECTÓNICA POR NIVEL
+    // =========================================================================
+    function createLevelPalette() {
+      const mk = (color, opts = {}) => {
+        const m = new THREE.MeshStandardMaterial({
+          color,
+          roughness: opts.roughness !== undefined ? opts.roughness : 0.78,
+          metalness: opts.metalness !== undefined ? opts.metalness : 0.06,
+          transparent: !!opts.transparent,
+          opacity: opts.opacity !== undefined ? opts.opacity : 1.0,
+          side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+          depthWrite: opts.depthWrite !== undefined ? opts.depthWrite : true
+        });
+        m.userData = {
+          baseOpacity: m.opacity,
+          baseTransparent: m.transparent,
+          baseDepthWrite: m.depthWrite,
+          category: opts.category || 'wall'
+        };
+        return m;
+      };
+
+      return {
+        wall: mk(0xeaecef, { roughness: 0.84, category: 'wall', doubleSide: true }),
+        wallInterior: mk(0xe2e6ec, { roughness: 0.85, category: 'wall', doubleSide: true }),
+        wallSage: mk(0x889984, { roughness: 0.88, category: 'wall', doubleSide: true }),
+        dadoGrey: mk(0x545b66, { roughness: 0.65, category: 'wall', doubleSide: true }),
+        dadoBrick: mk(0x8b4238, { roughness: 0.85, category: 'wall', doubleSide: true }),
+        slab: mk(0xcfd5de, { roughness: 0.86, category: 'slab' }),
+        slabRoof: mk(0xb7bfca, { roughness: 0.90, category: 'slab' }),
+        slabCourt: mk(0x2d6d60, { roughness: 0.82, category: 'slab' }),
+        slabGym: mk(0x3a4846, { roughness: 0.72, category: 'slab' }),
+        slabTerrazzo: mk(0xc4bfb4, { roughness: 0.68, category: 'slab' }),
+        column: mk(0xdce1e8, { roughness: 0.75, category: 'structure' }),
+        padBlue: mk(0x25539c, { roughness: 0.65, category: 'detail' }),
+        facadeGranite: mk(0x22272f, { roughness: 0.35, metalness: 0.18, category: 'facade' }),
+        facadePilaster: mk(0xa4aab3, { roughness: 0.82, category: 'facade' }),
+        facadeOchre: mk(0xbaa074, { roughness: 0.90, category: 'facade' }),
+        facadeInd: mk(0xc2beb6, { roughness: 0.92, category: 'facade' }),
+        gateMetal: mk(0x2a303a, { roughness: 0.45, metalness: 0.55, category: 'detail' }),
+        glass: mk(0x7cc4ea, { roughness: 0.12, metalness: 0.15, transparent: true, opacity: 0.34, depthWrite: false, doubleSide: true, category: 'glass' }),
+        frameDark: mk(0x2b323d, { roughness: 0.45, metalness: 0.45, category: 'detail' }),
+        marble: mk(0xede7db, { roughness: 0.32, metalness: 0.05, category: 'stair' }),
+        stairStep: mk(0x868c94, { roughness: 0.72, category: 'stair' }),
+        rampSurface: mk(0x3a414c, { roughness: 0.82, category: 'stair' }),
+        nosingYellow: mk(0xeab308, { roughness: 0.5, category: 'stair' }),
+        railingIron: mk(0x1f252e, { roughness: 0.4, metalness: 0.6, category: 'railing' }),
+        railingYellow: mk(0xeab308, { roughness: 0.45, metalness: 0.2, category: 'railing' }),
+        lineWhite: mk(0xf8fafc, { roughness: 0.6, category: 'detail' }),
+        furniture: mk(0x475569, { roughness: 0.65, category: 'detail' })
+      };
+    }
+
+    // =========================================================================
+    // 6. CONSTRUCTORES GEOMÉTRICOS DE PRECISIÓN ARQUITECTÓNICA
+    // =========================================================================
+    function tagMesh(mesh, levelIdx, clickable = true) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.levelIndex = levelIdx;
+      if (clickable && mesh.material && mesh.material.userData && mesh.material.userData.category !== 'glass') {
+        clickableMeshes.push(mesh);
+      }
+      return mesh;
+    }
+
+    function addBox(parent, levelIdx, x, y, z, w, h, d, mat, opts = {}) {
+      if (w <= 0.001 || h <= 0.001 || d <= 0.001) return null;
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x + w / 2, y + h / 2, z + d / 2);
+      if (opts.noShadow) {
+        mesh.castShadow = false;
+        mesh.receiveShadow = opts.receiveShadow !== false;
+      } else {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
+      mesh.userData.levelIndex = levelIdx;
+      if (opts.clickable !== false && mat.userData && mat.userData.category !== 'glass') {
+        clickableMeshes.push(mesh);
+      }
+      parent.add(mesh);
+
+      if (opts.edges) {
+        const eg = new THREE.EdgesGeometry(geo, 28);
+        const em = new THREE.LineBasicMaterial({ color: 0x1e293b, transparent: true, opacity: 0.35 });
+        const lines = new THREE.LineSegments(eg, em);
+        lines.userData.levelIndex = levelIdx;
+        lines.userData.isEdge = true;
+        mesh.add(lines);
+      }
+      return mesh;
+    }
+
+    function addSlabWithHoles(parent, levelIdx, x0, z0, w, d, yTop, thickness, holes, mat) {
+      const shape = new THREE.Shape();
+      shape.moveTo(x0, -(z0 + d));
+      shape.lineTo(x0 + w, -(z0 + d));
+      shape.lineTo(x0 + w, -z0);
+      shape.lineTo(x0, -z0);
+      shape.closePath();
+
+      (holes || []).forEach(h => {
+        const path = new THREE.Path();
+        path.moveTo(h.x, -(h.z + h.d));
+        path.lineTo(h.x, -h.z);
+        path.lineTo(h.x + h.w, -h.z);
+        path.lineTo(h.x + h.w, -(h.z + h.d));
+        path.closePath();
+        shape.holes.push(path);
+      });
+
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(0, yTop - thickness, 0);
+      tagMesh(mesh, levelIdx, true);
+      parent.add(mesh);
+
+      const eg = new THREE.EdgesGeometry(geo, 35);
+      const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.35 }));
+      lines.userData.levelIndex = levelIdx;
+      lines.userData.isEdge = true;
+      mesh.add(lines);
+      return mesh;
+    }
+
+    function addRailing(parent, levelIdx, x0, z0, x1, z1, yBase, h, mat, ornate = false) {
+      const dx = x1 - x0;
+      const dz = z1 - z0;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.1) return;
+      const angle = Math.atan2(-dz, dx);
+
+      const g = new THREE.Group();
+      g.position.set(x0, yBase, z0);
+      g.rotation.y = angle;
+
+      addBox(g, levelIdx, 0, h - 0.06, -0.035, len, 0.06, 0.07, mat, { clickable: false });
+      addBox(g, levelIdx, 0, 0.08, -0.025, len, 0.04, 0.05, mat, { clickable: false });
+      if (ornate) {
+        addBox(g, levelIdx, 0, h * 0.52, -0.02, len, 0.035, 0.04, mat, { clickable: false });
+      }
+
+      const step = ornate ? 0.24 : 0.45;
+      const count = Math.max(2, Math.floor(len / step));
+      for (let i = 0; i <= count; i++) {
+        const px = (i / count) * len;
+        const thick = (i === 0 || i === count) ? 0.065 : (ornate ? 0.03 : 0.035);
+        addBox(g, levelIdx, px - thick / 2, 0, -thick / 2, thick, h, thick, mat, { clickable: false });
+      }
+      parent.add(g);
+    }
+
+    function addHoleRailings(parent, levelIdx, hole, yBase, mat, skipSides = {}) {
+      const h = 1.02;
+      const m = 0.06;
+      if (!skipSides.N) addRailing(parent, levelIdx, hole.x + m, hole.z + m, hole.x + hole.w - m, hole.z + m, yBase, h, mat);
+      if (!skipSides.S) addRailing(parent, levelIdx, hole.x + m, hole.z + hole.d - m, hole.x + hole.w - m, hole.z + hole.d - m, yBase, h, mat);
+      if (!skipSides.W) addRailing(parent, levelIdx, hole.x + m, hole.z + m, hole.x + m, hole.z + hole.d - m, yBase, h, mat);
+      if (!skipSides.E) addRailing(parent, levelIdx, hole.x + hole.w - m, hole.z + m, hole.x + hole.w - m, hole.z + hole.d - m, yBase, h, mat);
+    }
+
+    function addWindowWall(parent, levelIdx, x0, z0, x1, z1, yBase, height, sillH, headH, panes, p, wallMat) {
+      const dx = x1 - x0;
+      const dz = z1 - z0;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.2) return;
+      const angle = Math.atan2(-dz, dx);
+      const t = 0.22;
+
+      const g = new THREE.Group();
+      g.position.set(x0, yBase, z0);
+      g.rotation.y = angle;
+      const wm = wallMat || p.wall;
+
+      if (sillH > 0.02) addBox(g, levelIdx, 0, 0, -t / 2, len, sillH, t, wm);
+      const lintelH = height - headH;
+      if (lintelH > 0.02) addBox(g, levelIdx, 0, headH, -t / 2, len, lintelH, t, wm);
+
+      const winH = headH - sillH;
+      if (winH > 0.1) {
+        addBox(g, levelIdx, 0.05, sillH + 0.04, -0.02, len - 0.1, winH - 0.08, 0.04, p.glass, { clickable: false, noShadow: true });
+        addBox(g, levelIdx, 0, sillH, -0.06, len, 0.05, 0.12, p.frameDark, { clickable: false });
+        addBox(g, levelIdx, 0, headH - 0.05, -0.06, len, 0.05, 0.12, p.frameDark, { clickable: false });
+        const count = Math.max(1, panes);
+        for (let i = 0; i <= count; i++) {
+          const px = (i / count) * len;
+          addBox(g, levelIdx, px - 0.03, sillH, -0.06, 0.06, winH, 0.12, p.frameDark, { clickable: false });
+        }
+      }
+      parent.add(g);
+    }
+
+    function addStairFlight(parent, levelIdx, opts, p) {
+      const {
+        x, yStart, z,
+        run, rise, width,
+        steps, dir = '+X',
+        stepMat = p.stairStep,
+        yellowNosing = true,
+        leftRail = true,
+        rightRail = true,
+        centerRail = false,
+        ornateRail = false,
+        solidBase = false
+      } = opts;
+
+      const g = new THREE.Group();
+      const tread = run / steps;
+      const riser = rise / steps;
+
+      for (let i = 0; i < steps; i++) {
+        const sx = i * tread;
+        const sy = i * riser;
+        const stepH = solidBase ? (sy + riser) : (riser + 0.18);
+        const stepY = solidBase ? 0 : Math.max(0, sy - 0.18);
+        addBox(g, levelIdx, sx, stepY, -width / 2, tread + 0.03, stepH, width, stepMat);
+
+        if (yellowNosing) {
+          addBox(g, levelIdx, sx, sy + riser - 0.015, -width / 2 + 0.04, 0.065, 0.022, width - 0.08, p.nosingYellow, { clickable: false, noShadow: true });
+        }
+      }
+
+      const addInclinedRail = (zPos) => {
+        const railLen = Math.hypot(run, rise);
+        const pitch = Math.atan2(rise, run);
+        const railMat = p.railingIron;
+        const rh = 0.96;
+
+        const barGeo = new THREE.BoxGeometry(railLen, 0.06, 0.06);
+        const bar = new THREE.Mesh(barGeo, railMat);
+        bar.position.set(run / 2, rise / 2 + rh, zPos);
+        bar.rotation.z = pitch;
+        tagMesh(bar, levelIdx, false);
+        g.add(bar);
+
+        if (ornateRail) {
+          const midBar = new THREE.Mesh(new THREE.BoxGeometry(railLen, 0.035, 0.04), railMat);
+          midBar.position.set(run / 2, rise / 2 + rh * 0.52, zPos);
+          midBar.rotation.z = pitch;
+          tagMesh(midBar, levelIdx, false);
+          g.add(midBar);
+        }
+
+        const postCount = ornateRail ? Math.max(6, Math.floor(steps * 1.1)) : Math.max(3, Math.floor(steps / 3));
+        for (let j = 0; j <= postCount; j++) {
+          const t = j / postCount;
+          const px = t * run;
+          const py = t * rise;
+          const thick = (j === 0 || j === postCount) ? 0.08 : (ornateRail ? 0.032 : 0.04);
+          addBox(g, levelIdx, px - thick / 2, py, zPos - thick / 2, thick, rh, thick, railMat, { clickable: false });
+        }
+      };
+
+      if (leftRail) addInclinedRail(-width / 2 + 0.06);
+      if (rightRail) addInclinedRail(width / 2 - 0.06);
+      if (centerRail) addInclinedRail(0);
+
+      g.position.set(x, yStart, z);
+      if (dir === '+X') g.rotation.y = 0;
+      else if (dir === '-X') g.rotation.y = Math.PI;
+      else if (dir === '+Z') g.rotation.y = -Math.PI / 2;
+      else if (dir === '-Z') g.rotation.y = Math.PI / 2;
+
+      parent.add(g);
+    }
+
+    function addRamp(parent, levelIdx, opts, p) {
+      const {
+        x, yStart, z,
+        run, rise, width,
+        dir = '+X',
+        mat = p.rampSurface,
+        solidUnder = true,
+        rails = true
+      } = opts;
+
+      const g = new THREE.Group();
+      const shape = new THREE.Shape();
+      const minY = Math.min(0, rise) - (solidUnder ? 0.35 : 0);
+
+      if (solidUnder) {
+        shape.moveTo(0, minY);
+        shape.lineTo(run, minY);
+        shape.lineTo(run, rise);
+        shape.lineTo(0, 0);
+        shape.closePath();
+      } else {
+        shape.moveTo(0, -0.22);
+        shape.lineTo(run, rise - 0.22);
+        shape.lineTo(run, rise);
+        shape.lineTo(0, 0);
+        shape.closePath();
+      }
+
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: false });
+      geo.translate(0, 0, -width / 2);
+      const mesh = new THREE.Mesh(geo, mat);
+      tagMesh(mesh, levelIdx, true);
+      g.add(mesh);
+
+      addBox(g, levelIdx, 0.05, 0.005, -width / 2 + 0.1, 0.14, 0.015, width - 0.2, p.nosingYellow, { clickable: false, noShadow: true });
+      addBox(g, levelIdx, run - 0.19, rise + 0.005, -width / 2 + 0.1, 0.14, 0.015, width - 0.2, p.nosingYellow, { clickable: false, noShadow: true });
+
+      if (rails) {
+        const railLen = Math.hypot(run, rise);
+        const pitch = Math.atan2(rise, run);
+        [-width / 2 + 0.07, width / 2 - 0.07].forEach(zPos => {
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(railLen, 0.05, 0.05), p.railingIron);
+          bar.position.set(run / 2, rise / 2 + 0.92, zPos);
+          bar.rotation.z = pitch;
+          tagMesh(bar, levelIdx, false);
+          g.add(bar);
+          for (let j = 0; j <= 4; j++) {
+            const t = j / 4;
+            addBox(g, levelIdx, t * run - 0.02, t * rise, zPos - 0.02, 0.04, 0.92, 0.04, p.railingIron, { clickable: false });
+          }
+        });
+      }
+
+      g.position.set(x, yStart, z);
+      if (dir === '+X') g.rotation.y = 0;
+      else if (dir === '-X') g.rotation.y = Math.PI;
+      else if (dir === '+Z') g.rotation.y = -Math.PI / 2;
+      else if (dir === '-Z') g.rotation.y = Math.PI / 2;
+
+      parent.add(g);
+    }
+
+    function addMainFacadeBand(parent, levelIdx, yBase, height, p, isTopFloor = false) {
+      const pilasterZ = [0, 4.9, 10.1, 14.4];
+      const pilasterW = [0.65, 0.65, 0.65, 0.60];
+
+      for (let i = 0; i < pilasterZ.length; i++) {
+        addBox(parent, levelIdx, -0.15, yBase, pilasterZ[i], 0.50, height, pilasterW[i], p.facadePilaster, { edges: true });
+      }
+
+      const bays = [
+        { z0: 0.65, z1: 4.9 },
+        { z0: 5.55, z1: 10.1 },
+        { z0: 10.75, z1: 14.4 }
+      ];
+      const spandrelH = height * 0.44;
+      const winH = height * 0.44;
+      const headH = height - spandrelH - winH;
+
+      bays.forEach(b => {
+        const bw = b.z1 - b.z0;
+        addBox(parent, levelIdx, 0.0, yBase, b.z0, 0.30, spandrelH, bw, p.facadeOchre, { edges: true });
+        addBox(parent, levelIdx, 0.0, yBase + spandrelH + winH, b.z0, 0.30, headH, bw, p.facadePilaster);
+        addBox(parent, levelIdx, 0.14, yBase + spandrelH + 0.04, b.z0 + 0.05, 0.04, winH - 0.08, bw - 0.1, p.glass, { clickable: false, noShadow: true });
+        addBox(parent, levelIdx, 0.08, yBase + spandrelH, b.z0, 0.12, 0.06, bw, p.frameDark, { clickable: false });
+        addBox(parent, levelIdx, 0.08, yBase + spandrelH + winH - 0.06, b.z0, 0.12, 0.06, bw, p.frameDark, { clickable: false });
+        for (let k = 0; k <= 3; k++) {
+          const kz = b.z0 + (k / 3) * bw;
+          addBox(parent, levelIdx, 0.08, yBase + spandrelH, kz - 0.03, 0.12, winH, 0.06, p.frameDark, { clickable: false });
+        }
+      });
+
+      if (isTopFloor) {
+        addBox(parent, levelIdx, -0.18, yBase + height, 0, 0.56, 0.55, 15.0, p.facadePilaster, { edges: true });
+      }
+    }
+
+    // =========================================================================
+    // 7. MODELADO ARQUITECTÓNICO DE LOS 7 NIVELES
+    // =========================================================================
+    function buildPB(g, p) {
+      const L = 0;
+
+      // A. FRANJA NORTE
+      addBox(g, L, 0, 1.55, -16, 13.5, 0.25, 5.2, p.slab);
+      addBox(g, L, 0, 1.55, -5.8, 13.5, 0.25, 5.8, p.slab);
+      addBox(g, L, 0, 0, -16, 0.35, 5.2, 5.2, p.facadeInd, { edges: true });
+      addBox(g, L, 0, 0, -5.8, 0.35, 5.2, 5.8, p.facadeInd, { edges: true });
+      addBox(g, L, 0.05, 0, -10.8, 0.16, 3.6, 5.0, p.gateMetal);
+      addBox(g, L, 0.05, 3.6, -10.8, 0.14, 1.2, 5.0, p.glass, { clickable: false, noShadow: true });
+      addBox(g, L, 0, 4.8, -10.8, 0.35, 0.45, 5.0, p.facadeInd);
+      addBox(g, L, 0.35, 0, -10.95, 13.15, 5.1, 0.22, p.wall);
+      addBox(g, L, 0.35, 0, -5.8, 13.15, 5.1, 0.22, p.wall);
+      addBox(g, L, 0, 0, -16, 13.5, 5.2, 0.28, p.wallSage);
+      addRamp(g, L, { x: 0.4, yStart: 0.0, z: -8.3, run: 13.2, rise: 1.80, width: 4.8, dir: '+X', rails: false }, p);
+
+      // Gimnasio Cubierto PB-23
+      addBox(g, L, 13.5, 1.50, -16, 27.0, 0.30, 16.0, p.slabGym);
+      addBox(g, L, 16.5, 1.81, -14.2, 21.0, 0.015, 0.10, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 16.5, 1.81, -1.8, 21.0, 0.015, 0.10, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 27.0, 1.81, -14.2, 0.10, 0.015, 12.4, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 13.5, 1.80, -16, 27.0, 1.85, 0.28, p.dadoBrick);
+      addBox(g, L, 13.5, 3.65, -16, 27.0, 1.95, 0.28, p.wall);
+      for (let cx = 16; cx <= 39; cx += 5.7) {
+        addBox(g, L, cx, 1.80, -15.65, 0.42, 3.80, 0.42, p.column);
+        addBox(g, L, cx - 0.03, 1.85, -15.68, 0.48, 1.65, 0.48, p.padBlue, { clickable: false });
+        addBox(g, L, cx, 1.80, -0.55, 0.42, 3.80, 0.42, p.column);
+        addBox(g, L, cx - 0.03, 1.85, -0.58, 0.48, 1.65, 0.48, p.padBlue, { clickable: false });
+        addBox(g, L, cx, 5.10, -15.7, 0.38, 0.48, 15.6, p.column);
+      }
+      addBox(g, L, 26.2, 3.7, -15.45, 1.6, 1.0, 0.08, p.lineWhite, { clickable: false });
+
+      // Cancha Descubierta Trasera
+      addBox(g, L, 40.5, 1.50, -16, 23.5, 0.30, 16.0, p.slabCourt);
+      addBox(g, L, 42.5, 1.81, -14.5, 16.0, 0.015, 0.10, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 42.5, 1.81, -2.5, 16.0, 0.015, 0.10, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 42.5, 1.81, -14.5, 0.10, 0.015, 12.0, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 58.5, 1.81, -14.5, 0.10, 0.015, 12.0, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 50.5, 1.81, -14.5, 0.10, 0.015, 12.0, p.lineWhite, { clickable: false, noShadow: true });
+      addBox(g, L, 40.5, 1.80, -16, 23.5, 1.80, 0.30, p.dadoBrick);
+      addBox(g, L, 40.5, 3.60, -16, 23.5, 5.0, 0.30, p.wallSage);
+      addBox(g, L, 63.7, 1.80, -16, 0.30, 1.80, 16.0, p.dadoBrick);
+      addBox(g, L, 63.7, 3.60, -16, 0.30, 5.0, 16.0, p.wallSage);
+      addBox(g, L, 60.0, 1.80, -16, 0.22, 3.4, 6.2, p.wallSage);
+      addBox(g, L, 60.0, 1.80, -9.8, 3.7, 3.4, 0.22, p.wallSage);
+      addBox(g, L, 60.0, 5.20, -16, 4.0, 0.22, 6.4, p.slabRoof);
+
+      // B. FRANJA SUR — ACCESO Y HALL PRINCIPAL (±0.00 m)
+      addBox(g, L, 0, -0.30, 0, 18.5, 0.30, 15.0, p.slabTerrazzo);
+      addBox(g, L, -0.10, 0, 0, 0.42, 2.80, 1.1, p.facadeGranite);
+      addBox(g, L, 0.04, 0, 1.1, 0.14, 2.65, 3.8, p.glass, { clickable: false, noShadow: true });
+      addBox(g, L, -0.10, 0, 4.9, 0.42, 2.80, 1.1, p.facadeGranite);
+      addBox(g, L, 0.06, 0, 6.0, 0.08, 2.65, 3.0, p.glass, { clickable: false, noShadow: true });
+      addRailing(g, L, 0.02, 6.0, 0.02, 9.0, 0, 2.65, p.gateMetal, true);
+      addBox(g, L, -0.10, 0, 9.0, 0.42, 2.80, 1.2, p.facadeGranite);
+      addBox(g, L, 0.04, 0, 10.2, 0.14, 2.65, 2.8, p.glass, { clickable: false, noShadow: true });
+      addBox(g, L, 0.02, 0, 13.0, 0.16, 2.65, 1.4, p.gateMetal);
+      addBox(g, L, -0.10, 0, 14.4, 0.42, 2.80, 0.6, p.facadeGranite);
+      addBox(g, L, -0.45, 2.68, 0, 0.85, 0.24, 15.0, p.facadeGranite, { edges: true });
+
+      addBox(g, L, 0, 0, 0, 14.5, 2.80, 0.26, p.wall);
+      addBox(g, L, 0, 0, 14.74, 18.5, 2.80, 0.26, p.wall);
+      addBox(g, L, 0.3, 0, 4.75, 13.5, 2.80, 0.20, p.wallInterior);
+      addBox(g, L, 13.8, 0, 0.26, 0.20, 2.80, 4.5, p.wallInterior);
+      addBox(g, L, 2.8, 0, 10.2, 13.8, 2.80, 0.20, p.wallInterior);
+      addBox(g, L, 7.5, 0, 10.2, 0.18, 2.80, 4.54, p.wallInterior);
+      addBox(g, L, 16.6, 0, 10.2, 0.18, 2.80, 3.0, p.wallInterior);
+
+      // Escalera Monumental de Mármol
+      addStairFlight(g, L, {
+        x: 1.0, yStart: 0.0, z: 7.5, run: 1.1, rise: 0.50, width: 2.8, steps: 3, dir: '+X',
+        stepMat: p.marble, yellowNosing: true, leftRail: false, rightRail: false, solidBase: true
+      }, p);
+      addBox(g, L, 2.1, 0, 6.1, 1.3, 0.50, 2.8, p.marble);
+      addStairFlight(g, L, {
+        x: 3.4, yStart: 0.50, z: 7.5, run: 9.2, rise: 4.10, width: 2.5, steps: 22, dir: '+X',
+        stepMat: p.marble, yellowNosing: false, leftRail: true, rightRail: true, ornateRail: true, solidBase: false
+      }, p);
+      addBox(g, L, 3.4, 0, 6.12, 8.2, 2.2, 0.18, p.wallInterior);
+      addBox(g, L, 3.4, 0, 8.70, 8.2, 2.2, 0.18, p.wallInterior);
+      addRailing(g, L, 2.2, 5.05, 5.5, 5.05, 0, 0.92, p.railingYellow, false);
+
+      // Descanso Imperial Superior (+4.60 m)
+      addBox(g, L, 12.6, 4.35, 5.5, 2.4, 0.25, 4.0, p.marble);
+      addRailing(g, L, 14.92, 5.55, 14.92, 9.45, 4.60, 1.0, p.railingIron, true);
+      addStairFlight(g, L, {
+        x: 13.8, yStart: 4.60, z: 5.5, run: 1.5, rise: 1.0, width: 1.9, steps: 5, dir: '-Z',
+        stepMat: p.marble, yellowNosing: true, leftRail: true, rightRail: true, ornateRail: true
+      }, p);
+      addStairFlight(g, L, {
+        x: 13.8, yStart: 4.60, z: 9.5, run: 1.5, rise: 1.0, width: 1.9, steps: 5, dir: '+Z',
+        stepMat: p.marble, yellowNosing: true, leftRail: true, rightRail: true, ornateRail: true
+      }, p);
+
+      // Rampas distribuidor
+      addRamp(g, L, { x: 15.8, yStart: 0.0, z: 4.8, run: 5.0, rise: 1.80, width: 2.2, dir: '-Z', rails: true }, p);
+      addRamp(g, L, { x: 18.2, yStart: 0.0, z: 8.1, run: 6.2, rise: -1.80, width: 2.3, dir: '+X', rails: true }, p);
+      addBox(g, L, 18.2, -1.80, 6.75, 6.2, 2.0, 0.18, p.dadoGrey);
+      addBox(g, L, 18.2, 0.20, 6.75, 6.2, 2.6, 0.18, p.wallInterior);
+      addBox(g, L, 18.2, -1.80, 9.28, 6.2, 2.0, 0.18, p.dadoGrey);
+      addBox(g, L, 18.2, 0.20, 9.28, 6.2, 2.6, 0.18, p.wallInterior);
+
+      // C. CORREDOR BAJO LONGITUDINAL (-1.80 m)
+      addBox(g, L, 18.5, -2.10, 0, 22.8, 0.30, 15.0, p.slabTerrazzo);
+      addBox(g, L, 18.5, -1.80, 0, 22.8, 4.60, 0.28, p.wall);
+      addBox(g, L, 18.5, -1.80, 14.74, 22.8, 4.60, 0.26, p.wall);
+
+      [24.2, 29.8, 37.8, 41.2].forEach(wx => {
+        addBox(g, L, wx, -1.80, 0.28, 0.20, 4.60, 6.47, p.wallInterior);
+      });
+      addWindowWall(g, L, 24.4, 6.75, 41.2, 6.75, -1.80, 4.60, 1.3, 3.5, 6, p, p.wallInterior);
+
+      [24.2, 29.8, 35.4, 41.2].forEach(wx => {
+        addBox(g, L, wx, -1.80, 9.45, 0.20, 4.60, 5.29, p.wallInterior);
+      });
+      addWindowWall(g, L, 24.4, 9.45, 41.2, 9.45, -1.80, 4.60, 1.3, 3.5, 6, p, p.wallInterior);
+
+      // D. SECTOR SUBIDA ESTE Y PULMÓN BAJO
+      addStairFlight(g, L, {
+        x: 41.2, yStart: -1.80, z: 8.1, run: 6.2, rise: 3.60, width: 3.1, steps: 18, dir: '+X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true, centerRail: true, solidBase: true
+      }, p);
+      addBox(g, L, 41.2, -1.80, 6.35, 6.2, 3.6, 0.20, p.dadoGrey);
+      addBox(g, L, 41.2, -1.80, 9.68, 6.2, 3.6, 0.20, p.dadoGrey);
+      addBox(g, L, 41.2, -1.80, 0.28, 6.2, 3.60, 6.07, p.slab);
+      addBox(g, L, 41.2, -1.80, 9.88, 6.2, 3.60, 4.86, p.slab);
+
+      addBox(g, L, 47.4, 1.50, 0, 6.6, 0.30, 15.0, p.slabTerrazzo);
+      addBox(g, L, 47.4, 1.80, 14.74, 16.6, 3.80, 0.26, p.wall);
+
+      addBox(g, L, 47.4, 1.80, 0, 2.0, 3.80, 0.26, p.wall);
+      addBox(g, L, 51.8, 1.80, 0, 2.2, 3.80, 0.26, p.wall);
+      addBox(g, L, 49.3, 1.80, 0.26, 0.20, 3.80, 5.4, p.wallInterior);
+      addBox(g, L, 51.7, 1.80, 0.26, 0.20, 3.80, 5.4, p.wallInterior);
+
+      // E. TALLER PB-23 FONDO ESTE
+      addBox(g, L, 54.0, 1.50, 0, 10.0, 0.30, 15.0, p.slab);
+      addWindowWall(g, L, 54.0, 0.26, 54.0, 9.2, 1.80, 3.80, 0.9, 3.2, 4, p, p.wallInterior);
+      addBox(g, L, 54.0, 1.80, 9.2, 0.24, 3.80, 5.54, p.wall);
+      addBox(g, L, 63.74, 1.80, 0, 0.26, 3.80, 15.0, p.wall);
+      addBox(g, L, 54.0, 1.80, 0, 10.0, 3.80, 0.26, p.wall);
+      [57.5, 61.2].forEach(cx => {
+        [4.2, 10.5].forEach(cz => addBox(g, L, cx, 1.80, cz, 0.38, 3.80, 0.38, p.column));
+      });
+
+      // F. ESCALERA EN U AL PULMÓN GENERAL
+      addStairFlight(g, L, {
+        x: 52.7, yStart: 1.80, z: 9.2, run: 3.1, rise: 1.75, width: 1.7, steps: 9, dir: '+Z',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true, solidBase: false
+      }, p);
+      addBox(g, L, 50.6, 3.30, 12.2, 3.2, 0.25, 2.2, p.slabTerrazzo);
+      addStairFlight(g, L, {
+        x: 50.6, yStart: 3.55, z: 12.9, run: 4.2, rise: 2.05, width: 1.8, steps: 11, dir: '-X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true, solidBase: false
+      }, p);
+    }
+
+    function buildEPPB(g, p) {
+      const L = 1;
+      const Y = 2.80;
+      const H = 2.80;
+
+      const holeMarble = { x: 3.4, z: 5.0, w: 12.2, d: 5.0 };
+      const holeRamp = { x: 41.2, z: 6.4, w: 6.4, d: 3.5 };
+      const holeU = { x: 46.2, z: 10.6, w: 7.6, d: 3.8 };
+      addSlabWithHoles(g, L, 0, 0, 54.0, 15.0, Y, 0.25, [holeMarble, holeRamp, holeU], p.slab);
+      addHoleRailings(g, L, holeMarble, Y, p.railingIron);
+      addMainFacadeBand(g, L, Y, H, p);
+
+      addWindowWall(g, L, 0.3, 0, 54.0, 0, Y, H, 1.0, 2.35, 12, p, p.wall);
+      addBox(g, L, 0.3, Y, 14.74, 53.7, H, 0.26, p.wall);
+      addBox(g, L, 53.75, Y, 0, 0.25, H, 15.0, p.wall);
+
+      addBox(g, L, 3.4, Y, 0.26, 0.18, H, 4.74, p.wallInterior);
+      addBox(g, L, 3.4, Y, 10.0, 0.18, H, 4.74, p.wallInterior);
+      addBox(g, L, 0.3, Y, 5.0, 3.1, H, 0.18, p.wallInterior);
+      addBox(g, L, 0.3, Y, 10.0, 3.1, H, 0.18, p.wallInterior);
+
+      [15.6, 19.5, 24.0, 33.0, 42.5, 49.5].forEach(wx => {
+        addBox(g, L, wx, Y, 0.26, 0.18, H, 5.8, p.wallInterior);
+      });
+      addWindowWall(g, L, 15.6, 6.0, 49.5, 6.0, Y, H, 1.05, 2.35, 8, p, p.wallInterior);
+
+      [15.6, 23.5, 40.5].forEach(wx => {
+        addBox(g, L, wx, Y, 8.8, 0.18, H, 5.94, p.wallInterior);
+      });
+      addWindowWall(g, L, 15.6, 8.8, 40.5, 8.8, Y, H, 1.05, 2.35, 6, p, p.wallInterior);
+    }
+
+    function build1P(g, p) {
+      const L = 2;
+      const Y = 5.60;
+      const H = 2.80;
+
+      const holeMarble = { x: 3.4, z: 5.5, w: 9.2, d: 4.0 };
+      const holePatioLuz = { x: 17.0, z: 3.2, w: 5.4, d: 4.8 };
+      const holePulmon = { x: 45.8, z: 5.0, w: 7.4, d: 4.2 };
+      addSlabWithHoles(g, L, 0, 0, 64.0, 15.0, Y, 0.26, [holeMarble, holePatioLuz, holePulmon], p.slabTerrazzo);
+
+      addHoleRailings(g, L, holeMarble, Y, p.railingIron, { E: true });
+      addHoleRailings(g, L, holePatioLuz, Y, p.railingIron);
+      addHoleRailings(g, L, holePulmon, Y, p.railingIron);
+
+      addMainFacadeBand(g, L, Y, H, p);
+
+      addBox(g, L, 0.3, Y, 14.74, 63.7, H, 0.26, p.wall);
+      addBox(g, L, 63.74, Y, 0, 0.26, H, 15.0, p.wall);
+      addBox(g, L, 0.3, Y, 0, 22.5, H, 0.24, p.wall);
+      addBox(g, L, 25.5, Y, 0, 15.0, H, 0.24, p.wall);
+      addWindowWall(g, L, 44.0, 0, 63.74, 0, Y, H, 1.0, 2.4, 5, p, p.wall);
+
+      addBox(g, L, 3.4, Y, 0.24, 0.18, H, 4.6, p.wallInterior);
+      addBox(g, L, 3.4, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
+      addBox(g, L, 12.6, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
+      addBox(g, L, 17.0, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
+
+      addStairFlight(g, L, {
+        x: 24.1, yStart: Y, z: 2.2, run: 2.0, rise: 0.45, width: 2.4, steps: 3, dir: '-Z',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: false, rightRail: false, solidBase: true
+      }, p);
+
+      // Bloque Central de Baños
+      addBox(g, L, 26.0, Y, 0.24, 0.20, H, 8.2, p.wallInterior);
+      addBox(g, L, 40.3, Y, 0.24, 0.20, H, 8.2, p.wallInterior);
+      addBox(g, L, 26.0, Y, 8.24, 14.5, H, 0.20, p.wallInterior);
+      addBox(g, L, 32.8, Y, 0.24, 0.18, H, 8.0, p.wallInterior);
+      addBox(g, L, 26.2, Y, 4.4, 14.1, H, 0.16, p.wallInterior);
+
+      [25.8, 33.8, 41.0, 48.0].forEach(wx => {
+        addBox(g, L, wx, Y, 10.8, 0.18, H, 3.94, p.wallInterior);
+      });
+      addWindowWall(g, L, 17.2, 10.8, 48.0, 10.8, Y, H, 1.05, 2.35, 8, p, p.wallInterior);
+
+      addWindowWall(g, L, 54.0, 0.24, 54.0, 9.6, Y, H, 1.05, 2.35, 3, p, p.wallInterior);
+      addBox(g, L, 59.5, Y, 0.24, 0.18, H, 9.4, p.wallInterior);
+      addBox(g, L, 54.0, Y, 11.4, 9.74, H, 0.18, p.wallInterior);
+
+      addStairFlight(g, L, {
+        x: 38.2, yStart: Y, z: 10.2, run: 4.6, rise: 2.80, width: 1.5, steps: 14, dir: '+X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true
+      }, p);
+
+      // Salón Taller 1P-32 + 1P-33
+      const H_TALLER = 5.60;
+      addBox(g, L, 16.0, Y - 0.26, -16.0, 24.5, 0.26, 16.0, p.slabTerrazzo);
+      addWindowWall(g, L, 16.0, -16.0, 16.0, 0.0, Y, H_TALLER, 0.95, 4.8, 6, p, p.wallSage);
+      addBox(g, L, 16.0, Y, -16.0, 24.5, H_TALLER, 0.28, p.wallSage);
+      addWindowWall(g, L, 40.3, -16.0, 40.3, -2.6, Y, H_TALLER, 1.0, 4.4, 4, p, p.wallSage);
+      addBox(g, L, 34.2, Y, -15.72, 0.20, 3.6, 4.8, p.wallInterior);
+      addBox(g, L, 34.2, Y, -10.92, 6.1, 3.6, 0.20, p.wallInterior);
+      for (let mx = 20; mx <= 32; mx += 4.5) {
+        addBox(g, L, mx, Y, -11.5, 2.4, 0.85, 1.1, p.furniture, { clickable: false });
+        addBox(g, L, mx, Y, -6.5, 2.4, 0.85, 1.1, p.furniture, { clickable: false });
+      }
+      addBox(g, L, 39.2, Y, -9.8, 0.7, 1.9, 3.8, p.frameDark, { clickable: false });
+
+      // Patio Descubierto 1P + Escalera Exterior
+      addBox(g, L, 40.5, Y - 0.24, -8.5, 3.8, 0.24, 8.5, p.slabRoof);
+      addRailing(g, L, 40.5, -8.45, 44.25, -8.45, Y, 1.05, p.railingIron, true);
+      addRailing(g, L, 44.25, -8.45, 44.25, -2.0, Y, 1.05, p.railingIron, true);
+      addStairFlight(g, L, {
+        x: 52.8, yStart: 1.80, z: -1.15, run: 8.6, rise: 3.80, width: 1.8, steps: 19, dir: '-X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: false, rightRail: true, solidBase: false
+      }, p);
+    }
+
+    function buildEP1P(g, p) {
+      const L = 3;
+      const Y = 8.40;
+      const H = 2.80;
+
+      const holeWest = { x: 6.0, z: 3.6, w: 10.2, d: 6.4 };
+      const holeMid = { x: 21.0, z: 3.6, w: 6.0, d: 4.2 };
+      const holePulmon = { x: 35.0, z: 3.8, w: 18.0, d: 5.8 };
+      addSlabWithHoles(g, L, 0, 0, 64.0, 15.0, Y, 0.25, [holeWest, holeMid, holePulmon], p.slab);
+
+      addHoleRailings(g, L, holeWest, Y, p.railingIron);
+      addHoleRailings(g, L, holeMid, Y, p.railingIron);
+      addHoleRailings(g, L, holePulmon, Y, p.railingIron);
+
+      addMainFacadeBand(g, L, Y, H, p);
+
+      addWindowWall(g, L, 0.3, 0, 63.74, 0, Y, H, 1.0, 2.4, 14, p, p.wall);
+      addBox(g, L, 0.3, Y, 14.74, 63.7, H, 0.26, p.wall);
+      addBox(g, L, 63.74, Y, 0, 0.26, H, 15.0, p.wall);
+
+      addBox(g, L, 5.8, Y, 0.24, 0.20, H, 14.5, p.wallInterior);
+
+      [16.2, 21.0, 27.0, 34.5, 53.5, 58.8].forEach(wx => {
+        addBox(g, L, wx, Y, 0.24, 0.18, H, 3.4, p.wallInterior);
+      });
+      [10.2, 21.0, 34.5, 48.0, 54.0].forEach(wx => {
+        addBox(g, L, wx, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
+      });
+      addWindowWall(g, L, 16.2, 10.2, 54.0, 10.2, Y, H, 1.05, 2.35, 9, p, p.wallInterior);
+
+      addStairFlight(g, L, {
+        x: 50.8, yStart: Y, z: 11.4, run: 4.4, rise: 2.80, width: 1.5, steps: 14, dir: '+X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true
+      }, p);
+    }
+
+    function build2P(g, p) {
+      const L = 4;
+      const Y = 11.20;
+      const H = 3.30;
+
+      // Cubierta plana sobre 1P-32
+      addBox(g, L, 16.0, Y - 0.26, -16.0, 24.5, 0.26, 16.0, p.slabRoof, { edges: true });
+      addBox(g, L, 16.0, Y, -16.0, 24.5, 0.65, 0.26, p.wallSage);
+      addBox(g, L, 16.0, Y, -16.0, 0.26, 0.65, 16.0, p.wallSage);
+      addBox(g, L, 40.24, Y, -16.0, 0.26, 0.65, 16.0, p.wallSage);
+
+      // Franja Sur completa
+      const holeStairMid = { x: 22.8, z: 5.0, w: 5.2, d: 3.4 };
+      const holePulmon = { x: 35.5, z: 5.8, w: 17.5, d: 3.8 };
+      addSlabWithHoles(g, L, 0, 0, 64.0, 15.0, Y, 0.26, [holeStairMid, holePulmon], p.slab);
+
+      addHoleRailings(g, L, holeStairMid, Y, p.railingIron);
+      addHoleRailings(g, L, holePulmon, Y, p.railingIron);
+
+      addMainFacadeBand(g, L, Y, H, p, true);
+
+      addWindowWall(g, L, 0.3, 0, 63.74, 0, Y, H, 1.05, 2.7, 14, p, p.wall);
+      addBox(g, L, 0.3, Y, 14.74, 63.7, H, 0.26, p.wall);
+      addBox(g, L, 63.74, Y, 0, 0.26, H, 15.0, p.wall);
+
+      addBox(g, L, 14.0, Y, 0.24, 0.22, H, 14.5, p.wallInterior);
+
+      [18.0, 22.8, 29.5, 35.5, 45.5, 53.5].forEach(wx => {
+        addBox(g, L, wx, Y, 0.24, 0.18, H, 4.8, p.wallInterior);
+      });
+      addWindowWall(g, L, 14.2, 5.0, 53.5, 5.0, Y, H, 1.05, 2.6, 10, p, p.wallInterior);
+
+      [21.5, 28.5, 35.0, 47.0, 54.0].forEach(wx => {
+        addBox(g, L, wx, Y, 10.0, 0.18, H, 4.74, p.wallInterior);
+      });
+      addWindowWall(g, L, 14.2, 10.0, 54.0, 10.0, Y, H, 1.05, 2.6, 10, p, p.wallInterior);
+
+      [4.0, 7.6, 11.2].forEach(wz => addBox(g, L, 54.5, Y, wz, 9.24, H, 0.18, p.wallInterior));
+      addWindowWall(g, L, 54.5, 0.24, 54.5, 14.74, Y, H, 1.05, 2.6, 4, p, p.wallInterior);
+
+      addStairFlight(g, L, {
+        x: 23.0, yStart: Y, z: 6.7, run: 4.8, rise: 3.30, width: 1.5, steps: 16, dir: '+X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true
+      }, p);
+      addStairFlight(g, L, {
+        x: 50.8, yStart: Y, z: 11.6, run: 4.8, rise: 3.30, width: 1.5, steps: 16, dir: '+X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true
+      }, p);
+    }
+
+    function build3P(g, p) {
+      const L = 5;
+      const Y = 14.50;
+      const H = 3.00;
+
+      addBox(g, L, 0.2, Y - 0.24, 0.2, 11.5, 0.24, 14.6, p.slabRoof);
+
+      const holeW3 = { x: 17.5, z: 4.5, w: 6.0, d: 3.2 };
+      addSlabWithHoles(g, L, 11.5, 2.2, 20.0, 10.4, Y, 0.25, [holeW3], p.slab);
+      addHoleRailings(g, L, holeW3, Y, p.railingIron);
+
+      addBox(g, L, 11.5, Y, 2.2, 0.24, H, 10.4, p.wall);
+      addWindowWall(g, L, 11.5, 2.2, 31.5, 2.2, Y, H, 1.0, 2.5, 5, p, p.wall);
+      addWindowWall(g, L, 11.5, 12.4, 31.5, 12.4, Y, H, 1.0, 2.5, 5, p, p.wall);
+      addBox(g, L, 17.5, Y, 2.4, 0.18, H, 10.0, p.wallInterior);
+      addBox(g, L, 23.6, Y, 2.4, 0.18, H, 10.0, p.wallInterior);
+
+      const holePulmon3 = { x: 40.5, z: 5.0, w: 11.5, d: 4.4 };
+      addSlabWithHoles(g, L, 31.5, 0, 32.5, 15.0, Y, 0.25, [holePulmon3], p.slab);
+      addHoleRailings(g, L, holePulmon3, Y, p.railingIron);
+
+      addBox(g, L, 31.5, Y, 0, 0.24, H, 2.3, p.wall);
+      addBox(g, L, 31.5, Y, 12.4, 0.24, H, 2.6, p.wall);
+      addWindowWall(g, L, 31.5, 0, 63.74, 0, Y, H, 1.0, 2.5, 8, p, p.wall);
+      addBox(g, L, 31.5, Y, 14.74, 32.5, H, 0.26, p.wall);
+      addBox(g, L, 63.74, Y, 0, 0.26, H, 15.0, p.wall);
+
+      [37.2, 42.5, 51.0, 58.2].forEach(wx => {
+        addBox(g, L, wx, Y, 0.24, 0.18, H, 4.6, p.wallInterior);
+      });
+      addWindowWall(g, L, 37.2, 4.8, 58.2, 4.8, Y, H, 1.0, 2.45, 6, p, p.wallInterior);
+      [37.2, 46.5, 53.5].forEach(wx => {
+        addBox(g, L, wx, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
+      });
+      addWindowWall(g, L, 37.2, 10.2, 53.5, 10.2, Y, H, 1.0, 2.45, 5, p, p.wallInterior);
+      addWindowWall(g, L, 58.2, 4.8, 58.2, 14.74, Y, H, 1.0, 2.45, 3, p, p.wallInterior);
+
+      addBox(g, L, 11.5, Y + H, 2.2, 20.0, 0.24, 10.4, p.slabRoof, { edges: true });
+      addSlabWithHoles(g, L, 31.5, 0, 22.5, 15.0, Y + H + 0.24, 0.24, [holePulmon3], p.slabRoof);
+      addBox(g, L, holePulmon3.x - 0.1, Y + H + 0.35, holePulmon3.z - 0.1, holePulmon3.w + 0.2, 0.12, holePulmon3.d + 0.2, p.glass, { clickable: false, noShadow: true });
+      addRailing(g, L, 11.6, 2.3, 31.4, 2.3, Y + H + 0.24, 0.55, p.wall);
+
+      addStairFlight(g, L, {
+        x: 54.0, yStart: Y, z: 13.6, run: 4.5, rise: 3.00, width: 1.4, steps: 15, dir: '-X',
+        stepMat: p.stairStep, yellowNosing: true, leftRail: true, rightRail: true
+      }, p);
+    }
+
+    function buildEP3P(g, p) {
+      const L = 6;
+      const Y = 17.50;
+      const H = 2.90;
+
+      addBox(g, L, 54.0, Y - 0.25, 0, 10.0, 0.25, 15.0, p.slab, { edges: true });
+      addBox(g, L, 54.0, Y, 0, 10.0, H, 0.26, p.wall);
+      addBox(g, L, 54.0, Y, 14.74, 10.0, H, 0.26, p.wall);
+      addBox(g, L, 63.74, Y, 0, 0.26, H, 15.0, p.wall);
+      addWindowWall(g, L, 54.0, 0.26, 54.0, 14.74, Y, H, 0.95, 2.45, 5, p, p.wall);
+
+      addWindowWall(g, L, 56.6, 0.26, 56.6, 14.74, Y, H, 1.0, 2.4, 4, p, p.wallInterior);
+      addBox(g, L, 56.6, Y, 3.6, 7.14, H, 0.18, p.wallInterior);
+      addBox(g, L, 56.6, Y, 11.4, 7.14, H, 0.18, p.wallInterior);
+
+      addBox(g, L, 53.9, Y + H, -0.1, 10.2, 0.28, 15.2, p.slabRoof, { edges: true });
+      addBox(g, L, 53.9, Y + H + 0.28, -0.1, 10.2, 0.45, 0.24, p.wall);
+      addBox(g, L, 53.9, Y + H + 0.28, 14.86, 10.2, 0.45, 0.24, p.wall);
+      addBox(g, L, 53.9, Y + H + 0.28, -0.1, 0.24, 0.45, 15.2, p.wall);
+      addBox(g, L, 63.86, Y + H + 0.28, -0.1, 0.24, 0.45, 15.2, p.wall);
+    }
+
+    // =========================================================================
+    // 8. CONSTRUCCIÓN DE LOS 14 PRISMAS 3D DE STANDS DE EXPOSICIÓN
+    // =========================================================================
+    function buildStands() {
+      STANDS_DATA.forEach(stand => {
+        const parentLevelGroup = levelGroups[stand.level];
+        if (!parentLevelGroup) return;
+
+        const standGroup = new THREE.Group();
+        standGroup.name = 'stand_' + stand.id;
+        standGroup.userData.isStandGroup = true;
+        standGroup.userData.standId = stand.id;
+
+        const baseColor = new THREE.Color(stand.color);
+        const edgeColor = new THREE.Color(stand.borderColor || stand.color);
+
+        // Material translúcido luminoso del prisma
+        const bodyMat = new THREE.MeshStandardMaterial({
+          color: baseColor,
+          emissive: baseColor,
+          emissiveIntensity: 0.35,
+          roughness: 0.28,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.56,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1
+        });
+
+        // Base de piso coloreada para anclar visualmente el stand sobre la losa
+        const baseMat = new THREE.MeshStandardMaterial({
+          color: baseColor,
+          emissive: baseColor,
+          emissiveIntensity: 0.42,
+          roughness: 0.45,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.88
+        });
+
+        // Aristas nítidas luminosas
+        const edgeMat = new THREE.LineBasicMaterial({
+          color: edgeColor,
+          transparent: true,
+          opacity: 0.95
+        });
+
+        stand.prisms.forEach(box => {
+          // Prisma principal translúcido
+          const prismGeo = new THREE.BoxGeometry(box.w, box.h, box.d);
+          const prismMesh = new THREE.Mesh(prismGeo, bodyMat);
+          prismMesh.position.set(box.x + box.w / 2, box.y + box.h / 2, box.z + box.d / 2);
+          prismMesh.renderOrder = 4;
+          prismMesh.userData.standId = stand.id;
+          prismMesh.userData.levelIndex = stand.level;
+          standGroup.add(prismMesh);
+          standClickableMeshes.push(prismMesh);
+
+          // Contorno 3D del prisma
+          const edgesGeo = new THREE.EdgesGeometry(prismGeo);
+          const edgeLines = new THREE.LineSegments(edgesGeo, edgeMat);
+          edgeLines.position.copy(prismMesh.position);
+          edgeLines.renderOrder = 5;
+          standGroup.add(edgeLines);
+
+          // Placa base sólida sobre el piso
+          const plateGeo = new THREE.BoxGeometry(box.w, 0.09, box.d);
+          const plateMesh = new THREE.Mesh(plateGeo, baseMat);
+          plateMesh.position.set(box.x + box.w / 2, box.y + 0.045, box.z + box.d / 2);
+          plateMesh.userData.standId = stand.id;
+          plateMesh.userData.levelIndex = stand.level;
+          standGroup.add(plateMesh);
+        });
+
+        parentLevelGroup.add(standGroup);
+        standVisuals[stand.id] = { stand, group: standGroup, bodyMat, baseMat, edgeMat };
+      });
+    }
+
+    // =========================================================================
+    // 9. ENTORNO URBANO 3D DETALLADO DE CALLE PERÚ (SIN EDIFICIOS AL OESTE)
+    // =========================================================================
+    function createCobblestoneTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#1b2029';
+      ctx.fillRect(0, 0, 512, 512);
+
+      const rows = 16;
+      const cols = 10;
+      const rowH = 512 / rows;
+      const colW = 512 / cols;
+      let seed = 1337;
+      const rand = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+
+      for (let r = 0; r < rows; r++) {
+        const offsetX = (r % 2) * (colW * 0.5);
+        for (let c = -1; c <= cols; c++) {
+          const x = c * colW + offsetX + 2;
+          const y = r * rowH + 2;
+          const w = colW - 4;
+          const h = rowH - 4;
+
+          const lum = 74 + Math.floor(rand() * 38);
+          const warm = Math.floor((rand() - 0.45) * 12);
+          ctx.fillStyle = `rgb(${lum + warm}, ${lum + 2}, ${lum + 6 - Math.floor(warm * 0.5)})`;
+          ctx.fillRect(x, y, w, h);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.11)';
+          ctx.fillRect(x, y, w, 2.5);
+          ctx.fillStyle = 'rgba(10, 14, 22, 0.22)';
+          ctx.fillRect(x, y + h - 2.5, w, 2.5);
+        }
+      }
+
+      for (let i = 0; i < 1800; i++) {
+        const gx = Math.floor(rand() * 512);
+        const gy = Math.floor(rand() * 512);
+        ctx.fillStyle = rand() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+        ctx.fillRect(gx, gy, 2, 2);
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(3.2, 22);
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    function createSidewalkTexture(repeatX, repeatY, warmTint = false) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = warmTint ? '#9c9a92' : '#8d9299';
+      ctx.fillRect(0, 0, 256, 256);
+
+      const step = 64;
+      let seed = warmTint ? 421 : 907;
+      const rand = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+
+      for (let y = 0; y < 256; y += step) {
+        for (let x = 0; x < 256; x += step) {
+          const delta = Math.floor((rand() - 0.5) * 14);
+          const baseR = (warmTint ? 156 : 142) + delta;
+          const baseG = (warmTint ? 153 : 146) + delta;
+          const baseB = (warmTint ? 144 : 152) + delta;
+          ctx.fillStyle = `rgb(${baseR},${baseG},${baseB})`;
+          ctx.fillRect(x + 2, y + 2, step - 4, step - 4);
+
+          ctx.strokeStyle = 'rgba(30, 36, 46, 0.20)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 2, y + 2, step - 4, step - 4);
+          ctx.beginPath();
+          ctx.moveTo(x + step / 2, y + 2);
+          ctx.lineTo(x + step / 2, y + step - 2);
+          ctx.moveTo(x + 2, y + step / 2);
+          ctx.lineTo(x + step - 2, y + step / 2);
+          ctx.stroke();
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repeatX, repeatY);
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    function createStreetMarkingTexture(text) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 512, 256);
+
+      ctx.save();
+      ctx.font = '700 132px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.72)';
+      ctx.fillText(text, 256, 134);
+      ctx.restore();
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    function createUrbanSignTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 176;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#1d4ed8';
+      ctx.fillRect(0, 0, 128, 176);
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 7;
+      ctx.strokeRect(7, 7, 114, 162);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(18, 20, 92, 74);
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.arc(46, 40, 8, 0, Math.PI * 2);
+      ctx.arc(78, 44, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(40, 50, 12, 30);
+      ctx.fillRect(72, 53, 12, 27);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '700 16px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('PERÚ', 64, 126);
+      ctx.font = '600 13px Inter, Arial, sans-serif';
+      ctx.fillText('700 - 800', 64, 148);
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function buildSiteBase() {
+      const site = new THREE.Group();
+
+      // 1. Base arquitectónica ampliada hacia el Oeste (-X) para abarcar ambas veredas y la calle
+      const baseGeo = new THREE.BoxGeometry(104, 0.45, 62);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.92, metalness: 0.08 });
+      const base = new THREE.Mesh(baseGeo, baseMat);
+      base.position.set(-9.5, -2.38, 0);
+      base.receiveShadow = true;
+      site.add(base);
+
+      const grid = new THREE.GridHelper(130, 52, 0x334155, 0x1e293b);
+      grid.position.set(-9.5, -2.14, 0);
+      grid.material.opacity = 0.28;
+      grid.material.transparent = true;
+      site.add(grid);
+
+      const streetLocal = new THREE.Group();
+      streetLocal.position.set(BLDG_OFFSET_X, 0, BLDG_OFFSET_Z);
+      site.add(streetLocal);
+
+      streetDetailsGroup = new THREE.Group();
+      streetDetailsGroup.name = 'CallePeruDetalles';
+      streetLocal.add(streetDetailsGroup);
+
+      // Materiales del entorno urbano
+      const matSidewalkEast = new THREE.MeshStandardMaterial({
+        map: createSidewalkTexture(2.2, 26, true),
+        roughness: 0.88,
+        metalness: 0.04
+      });
+      const matSidewalkWest = new THREE.MeshStandardMaterial({
+        map: createSidewalkTexture(6.2, 28, false),
+        roughness: 0.88,
+        metalness: 0.04
+      });
+      const matCobble = new THREE.MeshStandardMaterial({
+        map: createCobblestoneTexture(),
+        roughness: 0.86,
+        metalness: 0.08
+      });
+      const matCurb = new THREE.MeshStandardMaterial({ color: 0x6c737d, roughness: 0.85 });
+      const matCurbYellow = new THREE.MeshStandardMaterial({ color: 0xdca715, roughness: 0.65 });
+      const matGrate = new THREE.MeshStandardMaterial({ color: 0x2a313b, roughness: 0.52, metalness: 0.62 });
+      const matCastIron = new THREE.MeshStandardMaterial({ color: 0x171c24, roughness: 0.36, metalness: 0.72 });
+      const matLampGlow = new THREE.MeshStandardMaterial({
+        color: 0xfef3c7,
+        emissive: 0xfde68a,
+        emissiveIntensity: 1.55,
+        roughness: 0.2
+      });
+      const matStonePlanter = new THREE.MeshStandardMaterial({ color: 0x5c636e, roughness: 0.88 });
+      const matSoil = new THREE.MeshStandardMaterial({ color: 0x3b2f26, roughness: 0.96 });
+      const matGrass = new THREE.MeshStandardMaterial({ color: 0x3f6a3b, roughness: 0.92 });
+      const matWood = new THREE.MeshStandardMaterial({ color: 0x8b5a34, roughness: 0.78 });
+      const matBark = new THREE.MeshStandardMaterial({ color: 0x56483e, roughness: 0.94 });
+      const matFoliage = [
+        new THREE.MeshStandardMaterial({ color: 0x3b6939, roughness: 0.86 }),
+        new THREE.MeshStandardMaterial({ color: 0x528748, roughness: 0.84 }),
+        new THREE.MeshStandardMaterial({ color: 0x6ea659, roughness: 0.82 })
+      ];
+      const matBlossomJacaranda = new THREE.MeshStandardMaterial({
+        color: 0x9b82e8,
+        emissive: 0x5b46a8,
+        emissiveIntensity: 0.18,
+        roughness: 0.75
+      });
+      const matBlossomSpring = new THREE.MeshStandardMaterial({
+        color: 0xdbe86d,
+        emissive: 0x6b7a1f,
+        emissiveIntensity: 0.14,
+        roughness: 0.78
+      });
+
+      const mkStreetBox = (parent, x, y, z, w, h, d, mat, cast = false, receive = true) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        mesh.position.set(x + w / 2, y + h / 2, z + d / 2);
+        mesh.castShadow = cast;
+        mesh.receiveShadow = receive;
+        parent.add(mesh);
+        return mesh;
+      };
+
+      // 2. Vereda de la Institución (Este)
+      mkStreetBox(streetLocal, -3.0, -0.24, -22, 3.0, 0.24, 44, matSidewalkEast, false, true);
+      mkStreetBox(streetLocal, -3.06, -0.24, -22, 0.14, 0.25, 44, matCurb, false, true);
+      mkStreetBox(streetLocal, -3.07, -0.02, 0.2, 0.16, 0.035, 14.6, matCurbYellow, false, true);
+
+      // 3. Calzada adoquinada Calle Perú
+      mkStreetBox(streetLocal, -9.6, -0.24, -23, 6.6, 0.14, 46, matCobble, false, true);
+      [-3.16, -9.44].forEach(gx => {
+        mkStreetBox(streetLocal, gx - 0.11, -0.105, -23, 0.22, 0.025, 46, matGrate, false, true);
+        for (let gz = -22; gz <= 22; gz += 1.5) {
+          mkStreetBox(streetLocal, gx - 0.11, -0.095, gz, 0.22, 0.012, 0.06, matCastIron, false, false);
+        }
+      });
+
+      const peruDecalMat = new THREE.MeshBasicMaterial({
+        map: createStreetMarkingTexture('Perú'),
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false
+      });
+      const peruDecal = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.2), peruDecalMat);
+      peruDecal.rotation.x = -Math.PI / 2;
+      peruDecal.rotation.z = Math.PI / 2;
+      peruDecal.position.set(-6.3, -0.092, 2.5);
+      streetLocal.add(peruDecal);
+
+      // 4. Vereda opuesta arbolada (Oeste — sin edificaciones)
+      mkStreetBox(streetLocal, -18.5, -0.24, -23, 8.9, 0.24, 46, matSidewalkWest, false, true);
+      mkStreetBox(streetLocal, -9.68, -0.24, -23, 0.14, 0.25, 46, matCurb, false, true);
+      mkStreetBox(streetLocal, -18.5, -2.15, -23, 18.5, 1.91, 46, baseMat, false, true);
+
+      // 5. Bolardos bajos cónicos negros
+      const bollardBaseGeo = new THREE.CylinderGeometry(0.135, 0.155, 0.22, 14);
+      const bollardMidGeo = new THREE.CylinderGeometry(0.085, 0.135, 0.22, 14);
+      const bollardTipGeo = new THREE.SphereGeometry(0.085, 12, 8);
+      const addBollard = (bx, bz) => {
+        const bg = new THREE.Group();
+        bg.position.set(bx, -0.10, bz);
+        const m1 = new THREE.Mesh(bollardBaseGeo, matCastIron);
+        m1.position.y = 0.11;
+        m1.castShadow = true;
+        m1.receiveShadow = true;
+        const m2 = new THREE.Mesh(bollardMidGeo, matCastIron);
+        m2.position.y = 0.33;
+        m2.castShadow = true;
+        const m3 = new THREE.Mesh(bollardTipGeo, matCastIron);
+        m3.position.y = 0.44;
+        m3.castShadow = true;
+        bg.add(m1, m2, m3);
+        streetDetailsGroup.add(bg);
+      };
+      for (let bz = -20.5; bz <= 20.5; bz += 3.5) {
+        addBollard(-3.55, bz);
+        addBollard(-9.05, bz);
+      }
+
+      // 6. Faroles coloniales estilo San Telmo
+      const addColonialLamp = (lx, lz, withLight = false) => {
+        const lg = new THREE.Group();
+        lg.position.set(lx, 0.0, lz);
+
+        const basePed = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.20, 0.55, 8), matCastIron);
+        basePed.position.y = 0.275;
+        basePed.castShadow = true;
+        lg.add(basePed);
+
+        const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 0.16, 8), matCastIron);
+        collar.position.y = 0.62;
+        lg.add(collar);
+
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.085, 3.05, 10), matCastIron);
+        pole.position.y = 2.20;
+        pole.castShadow = true;
+        lg.add(pole);
+
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.07, 0.16, 6), matCastIron);
+        neck.position.y = 3.78;
+        lg.add(neck);
+
+        const lanternGlass = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.13, 0.42, 6), matLampGlow);
+        lanternGlass.position.y = 4.06;
+        lg.add(lanternGlass);
+
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.22, 6), matCastIron);
+        cap.position.y = 4.38;
+        cap.castShadow = true;
+        lg.add(cap);
+
+        const finial = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), matCastIron);
+        finial.position.y = 4.51;
+        lg.add(finial);
+
+        if (withLight) {
+          const pLight = new THREE.PointLight(0xfde68a, 0.42, 15, 1.8);
+          pLight.position.set(0, 4.05, 0);
+          lg.add(pLight);
+        }
+
+        streetDetailsGroup.add(lg);
+      };
+
+      [-17.5, -8.5, 1.2, 11.2, 19.5].forEach((lz, i) => {
+        addColonialLamp(-2.72, lz, i === 1 || i === 2 || i === 3);
+      });
+      [-16.0, -6.0, 4.5, 14.5].forEach((lz, i) => {
+        addColonialLamp(-9.95, lz, i === 1 || i === 2);
+      });
+
+      // 7. Cartel azul de señalización urbana
+      const signGroup = new THREE.Group();
+      signGroup.position.set(-2.62, 0.0, 4.35);
+      const signPole = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.035, 2.75, 8), matCurb);
+      signPole.position.y = 1.375;
+      signPole.castShadow = true;
+      signGroup.add(signPole);
+
+      const signTex = createUrbanSignTexture();
+      const signMatFace = new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.42, metalness: 0.12 });
+      const signMatSide = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.4 });
+      const signBoard = new THREE.Mesh(
+        new THREE.BoxGeometry(0.46, 0.64, 0.03),
+        [signMatSide, signMatSide, signMatSide, signMatSide, signMatFace, signMatFace]
+      );
+      signBoard.position.y = 2.48;
+      signBoard.castShadow = true;
+      signGroup.add(signBoard);
+      streetDetailsGroup.add(signGroup);
+
+      // 8. Canteros con arbustos y bancos en vereda opuesta
+      const addPlanterWithShrubs = (px, pz, pw, pd, shrubSeeds) => {
+        const pg = new THREE.Group();
+        pg.position.set(px, 0.0, pz);
+
+        const rimH = 0.22;
+        const rimT = 0.14;
+        mkStreetBox(pg, -pw / 2, 0, -pd / 2, pw, rimH, rimT, matStonePlanter, true, true);
+        mkStreetBox(pg, -pw / 2, 0, pd / 2 - rimT, pw, rimH, rimT, matStonePlanter, true, true);
+        mkStreetBox(pg, -pw / 2, 0, -pd / 2, rimT, rimH, pd, matStonePlanter, true, true);
+        mkStreetBox(pg, pw / 2 - rimT, 0, -pd / 2, rimT, rimH, pd, matStonePlanter, true, true);
+
+        mkStreetBox(pg, -pw / 2 + rimT, 0.02, -pd / 2 + rimT, pw - rimT * 2, 0.14, pd - rimT * 2, matSoil, false, true);
+        mkStreetBox(pg, -pw / 2 + rimT + 0.06, 0.15, -pd / 2 + rimT + 0.06, pw - rimT * 2 - 0.12, 0.04, pd - rimT * 2 - 0.12, matGrass, false, true);
+
+        shrubSeeds.forEach(s => {
+          const geo = new THREE.DodecahedronGeometry(s.r, 1);
+          const bush = new THREE.Mesh(geo, matFoliage[s.c % matFoliage.length]);
+          bush.position.set(s.ox, 0.18 + s.r * 0.62, s.oz);
+          bush.scale.set(1.15, 0.78, 1.05);
+          bush.rotation.set(s.ox * 1.3, s.oz * 1.7, 0.2);
+          bush.castShadow = true;
+          bush.receiveShadow = true;
+          pg.add(bush);
+        });
+
+        streetDetailsGroup.add(pg);
+      };
+
+      addPlanterWithShrubs(-13.8, -14.8, 2.3, 4.4, [
+        { ox: -0.35, oz: -1.2, r: 0.48, c: 0 },
+        { ox: 0.30, oz: -0.4, r: 0.56, c: 1 },
+        { ox: -0.20, oz: 0.6, r: 0.52, c: 2 },
+        { ox: 0.32, oz: 1.35, r: 0.42, c: 0 }
+      ]);
+      addPlanterWithShrubs(-14.6, -2.5, 2.4, 5.2, [
+        { ox: -0.4, oz: -1.6, r: 0.55, c: 1 },
+        { ox: 0.25, oz: -0.7, r: 0.62, c: 0 },
+        { ox: -0.25, oz: 0.5, r: 0.50, c: 2 },
+        { ox: 0.35, oz: 1.5, r: 0.54, c: 1 }
+      ]);
+      addPlanterWithShrubs(-13.8, 8.8, 2.3, 4.6, [
+        { ox: -0.3, oz: -1.3, r: 0.52, c: 2 },
+        { ox: 0.25, oz: -0.2, r: 0.58, c: 0 },
+        { ox: -0.15, oz: 0.9, r: 0.46, c: 1 },
+        { ox: 0.35, oz: 1.45, r: 0.40, c: 2 }
+      ]);
+
+      const addUrbanBench = (bx, bz) => {
+        const bg = new THREE.Group();
+        bg.position.set(bx, 0.0, bz);
+
+        [-0.82, 0.82].forEach(zOff => {
+          mkStreetBox(bg, -0.28, 0.0, zOff - 0.04, 0.56, 0.44, 0.08, matCastIron, true, true);
+          mkStreetBox(bg, -0.30, 0.44, zOff - 0.04, 0.07, 0.42, 0.08, matCastIron, true, true);
+        });
+        [-0.18, 0.0, 0.18].forEach(xOff => {
+          mkStreetBox(bg, xOff - 0.06, 0.44, -0.98, 0.12, 0.045, 1.96, matWood, true, true);
+        });
+        [0.62, 0.78].forEach(yOff => {
+          mkStreetBox(bg, -0.26, yOff, -0.98, 0.045, 0.11, 1.96, matWood, true, true);
+        });
+
+        streetDetailsGroup.add(bg);
+      };
+
+      addUrbanBench(-15.2, -9.2);
+      addUrbanBench(-15.2, 2.6);
+      addUrbanBench(-15.2, 14.2);
+
+      // 9. Arbolado urbano porteño
+      const addPortenoTree = (opts) => {
+        const {
+          x, z, height = 8.2, leanX = 0.08, leanZ = 0.04,
+          canopyScale = 1.0, blossomType = null, pitSize = 1.6
+        } = opts;
+
+        const tg = new THREE.Group();
+        tg.position.set(x, 0.0, z);
+
+        const rimT = 0.10;
+        mkStreetBox(tg, -pitSize / 2, 0, -pitSize / 2, pitSize, 0.10, rimT, matStonePlanter, false, true);
+        mkStreetBox(tg, -pitSize / 2, 0, pitSize / 2 - rimT, pitSize, 0.10, rimT, matStonePlanter, false, true);
+        mkStreetBox(tg, -pitSize / 2, 0, -pitSize / 2, rimT, 0.10, pitSize, matStonePlanter, false, true);
+        mkStreetBox(tg, pitSize / 2 - rimT, 0, -pitSize / 2, rimT, 0.10, pitSize, matStonePlanter, false, true);
+        mkStreetBox(tg, -pitSize / 2 + rimT, 0.01, -pitSize / 2 + rimT, pitSize - rimT * 2, 0.06, pitSize - rimT * 2, matSoil, false, true);
+
+        const trunkH = height * 0.48;
+        const trunkRTop = 0.15 * canopyScale;
+        const trunkRBot = 0.24 * canopyScale;
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(trunkRTop, trunkRBot, trunkH, 9), matBark);
+        trunk.position.set(leanX * trunkH * 0.5, trunkH * 0.5, leanZ * trunkH * 0.5);
+        trunk.rotation.z = -leanX;
+        trunk.rotation.x = leanZ;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+        tg.add(trunk);
+
+        const forkX = leanX * trunkH;
+        const forkY = trunkH * 0.94;
+        const forkZ = leanZ * trunkH;
+
+        const branches = [
+          { dx: 1.15, dy: 2.1, dz: 0.65, r: 1.55 },
+          { dx: -0.95, dy: 2.35, dz: 0.75, r: 1.48 },
+          { dx: 0.35, dy: 2.65, dz: -1.05, r: 1.52 },
+          { dx: -0.85, dy: 1.95, dz: -0.85, r: 1.32 },
+          { dx: 0.15, dy: 3.15, dz: 0.10, r: 1.62 }
+        ];
+
+        branches.forEach((b, bi) => {
+          const bx = b.dx * canopyScale;
+          const by = b.dy * canopyScale;
+          const bz = b.dz * canopyScale;
+          const len = Math.hypot(bx, by, bz);
+
+          const branchMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.055 * canopyScale, 0.115 * canopyScale, len, 7),
+            matBark
+          );
+          const dirVec = new THREE.Vector3(bx, by, bz).normalize();
+          branchMesh.position.set(forkX + bx * 0.5, forkY + by * 0.5, forkZ + bz * 0.5);
+          branchMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVec);
+          branchMesh.castShadow = true;
+          tg.add(branchMesh);
+
+          const tipX = forkX + bx;
+          const tipY = forkY + by;
+          const tipZ = forkZ + bz;
+          const mainR = b.r * canopyScale;
+
+          const puff1 = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(mainR, 1),
+            matFoliage[bi % matFoliage.length]
+          );
+          puff1.position.set(tipX, tipY + 0.15 * canopyScale, tipZ);
+          puff1.scale.set(1.18, 0.78, 1.12);
+          puff1.rotation.set(bi * 0.7, bi * 1.1, bi * 0.4);
+          puff1.castShadow = true;
+          puff1.receiveShadow = true;
+          tg.add(puff1);
+
+          const puff2 = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(mainR * 0.72, 1),
+            matFoliage[(bi + 1) % matFoliage.length]
+          );
+          puff2.position.set(
+            tipX + (bi % 2 === 0 ? 0.55 : -0.55) * canopyScale,
+            tipY + 0.48 * canopyScale,
+            tipZ + (bi % 2 === 0 ? -0.4 : 0.45) * canopyScale
+          );
+          puff2.scale.set(1.08, 0.75, 1.05);
+          puff2.castShadow = true;
+          tg.add(puff2);
+
+          if (blossomType && bi % 2 === 0) {
+            const blMat = blossomType === 'jacaranda' ? matBlossomJacaranda : matBlossomSpring;
+            const bl = new THREE.Mesh(new THREE.DodecahedronGeometry(mainR * 0.36, 0), blMat);
+            bl.position.set(
+              tipX + 0.32 * canopyScale,
+              tipY + 0.65 * canopyScale,
+              tipZ - 0.22 * canopyScale
+            );
+            bl.scale.set(1.2, 0.65, 1.1);
+            tg.add(bl);
+          }
+        });
+
+        streetDetailsGroup.add(tg);
+      };
+
+      // 6 árboles en la vereda opuesta
+      addPortenoTree({ x: -12.4, z: -18.8, height: 8.6, leanX: 0.10, leanZ: 0.04, canopyScale: 1.02, blossomType: 'spring' });
+      addPortenoTree({ x: -11.8, z: -11.0, height: 9.4, leanX: 0.14, leanZ: -0.03, canopyScale: 1.12, blossomType: 'jacaranda' });
+      addPortenoTree({ x: -12.2, z: -3.2,  height: 7.8, leanX: 0.09, leanZ: 0.05, canopyScale: 0.94 });
+      addPortenoTree({ x: -11.9, z: 4.8,   height: 9.8, leanX: 0.13, leanZ: -0.02, canopyScale: 1.15, blossomType: 'jacaranda' });
+      addPortenoTree({ x: -12.5, z: 12.6,  height: 8.4, leanX: 0.08, leanZ: 0.04, canopyScale: 1.00, blossomType: 'spring' });
+      addPortenoTree({ x: -14.8, z: 19.2,  height: 7.4, leanX: 0.06, leanZ: -0.04, canopyScale: 0.90 });
+
+      // 2 árboles menores en extremos Norte y Sur de la vereda del colegio
+      addPortenoTree({ x: -2.15, z: -19.6, height: 6.2, leanX: -0.07, leanZ: 0.02, canopyScale: 0.72, pitSize: 1.25 });
+      addPortenoTree({ x: -2.15, z: 19.6,  height: 6.4, leanX: -0.06, leanZ: -0.03, canopyScale: 0.74, pitSize: 1.25, blossomType: 'spring' });
+
+      scene.add(site);
+    }
+
+    // =========================================================================
+    // 10. VISUALIZACIÓN POR PISO AISLADO Y STANDS (SIN RAYOS X)
+    // =========================================================================
+    function updateVisualMaterials() {
+      const sel = state.selectedLevel;
+      const isOverview = (sel === -1);
+
+      // 1. Mostrar todo el edificio en vista inicial, o aislar únicamente el piso elegido
+      levelGroups.forEach((grp, idx) => {
+        grp.visible = isOverview ? true : (idx === sel);
+
+        const pal = levelPalettes[idx];
+        Object.keys(pal).forEach(key => {
+          const mat = pal[key];
+          mat.opacity = mat.userData.baseOpacity;
+          mat.transparent = mat.userData.baseTransparent;
+          mat.depthWrite = mat.userData.baseDepthWrite;
+          mat.emissive.setHex(0x000000);
+          mat.needsUpdate = true;
+        });
+
+        grp.traverse(obj => {
+          if (obj.userData && obj.userData.isEdge) {
+            obj.material.opacity = 0.34;
+          }
+        });
+      });
+
+      // 2. Prismas 3D de Stands: ocultos en la vista general; visibles solo en el piso seleccionado
+      Object.keys(standVisuals).forEach(id => {
+        const vis = standVisuals[id];
+        const onActiveFloor = (!isOverview && vis.stand.level === sel);
+        vis.group.visible = onActiveFloor;
+
+        if (!onActiveFloor) return;
+
+        const isStandSelected = (state.selectedStandId === id);
+        if (state.selectedStandId) {
+          if (isStandSelected) {
+            vis.bodyMat.opacity = 0.82;
+            vis.bodyMat.emissiveIntensity = 0.68;
+            vis.baseMat.opacity = 0.98;
+            vis.baseMat.emissiveIntensity = 0.74;
+            vis.edgeMat.opacity = 1.0;
+          } else {
+            vis.bodyMat.opacity = 0.22;
+            vis.bodyMat.emissiveIntensity = 0.12;
+            vis.baseMat.opacity = 0.35;
+            vis.baseMat.emissiveIntensity = 0.12;
+            vis.edgeMat.opacity = 0.32;
+          }
+        } else {
+          vis.bodyMat.opacity = 0.64;
+          vis.bodyMat.emissiveIntensity = 0.38;
+          vis.baseMat.opacity = 0.92;
+          vis.baseMat.emissiveIntensity = 0.45;
+          vis.edgeMat.opacity = 0.96;
+        }
+        vis.bodyMat.needsUpdate = true;
+        vis.baseMat.needsUpdate = true;
+        vis.edgeMat.needsUpdate = true;
+      });
+    }
+
+    // =========================================================================
+    // 11. CÁMARAS AUTOMÁTICAS ADAPTADAS A CELULAR VERTICAL Y ESCRITORIO
+    // =========================================================================
+    const FLOOR_VIEWS = {
+      '-1': { pos: [-58, 30, 42], target: [-6, 6.8, 0] },
+      '0':  { pos: [-34, 42, 36], target: [-9, 1.5, 0.5] },
+      '2':  { pos: [-24, 38, 38], target: [-4, 6.5, 4.5] },
+      '3':  { pos: [4, 38, 40],   target: [5, 9.5, 7.5] },
+      '4':  { pos: [-16, 44, 44], target: [-5, 12.5, 7.5] }
+    };
+
+    // Ajusta distancia y encuadre si el celular está en vertical (portrait) para que entre todo el edificio/piso
+    function getResponsiveCameraPose(posArr, targetArr, isStandZoom = false) {
+      const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+      const target = new THREE.Vector3(...targetArr);
+      const pos = new THREE.Vector3(...posArr);
+
+      if (aspect < 0.95) {
+        const offset = pos.clone().sub(target);
+        const factor = isStandZoom
+          ? Math.min(1.42, Math.max(1.08, 0.96 / Math.max(aspect, 0.52)))
+          : Math.min(1.62, Math.max(1.12, 1.04 / Math.max(aspect, 0.50)));
+        offset.multiplyScalar(factor);
+        // Elevar ligeramente el ángulo en móvil para ver mejor los stands desde arriba
+        offset.y *= isStandZoom ? 1.12 : 1.08;
+        pos.copy(target).add(offset);
+        // Desplazar sutilmente el centro hacia abajo para despejar la barra inferior móvil
+        target.y -= isStandZoom ? 0.6 : 1.2;
+      }
+
+      return { pos, target };
+    }
+
+    function animateCameraTo(posArr, targetArr, isStandZoom = false) {
+      const pose = getResponsiveCameraPose(posArr, targetArr, isStandZoom);
+      state.camAnim = {
+        startPos: camera.position.clone(),
+        endPos: pose.pos,
+        startTarget: controls.target.clone(),
+        endTarget: pose.target,
+        t: 0
+      };
+    }
+
+    function resetCurrentCameraView() {
+      if (state.selectedStandId) {
+        const stand = STANDS_DATA.find(s => s.id === state.selectedStandId);
+        if (stand && stand.camPos && stand.camTarget) {
+          animateCameraTo(stand.camPos, stand.camTarget, true);
+          return;
+        }
+      }
+      const view = FLOOR_VIEWS[String(state.selectedLevel)] || FLOOR_VIEWS['-1'];
+      animateCameraTo(view.pos, view.target, false);
+    }
+
+    function dismissTouchHint() {
+      if (state.hintDismissed) return;
+      state.hintDismissed = true;
+      const hint = document.getElementById('touch-hint');
+      if (hint) {
+        hint.style.opacity = '0';
+        setTimeout(() => hint.classList.add('hidden'), 500);
+      }
+    }
+
+    // =========================================================================
+    // 12. SELECCIÓN DE PISO AISLADO Y STANDS (ESCRITORIO + CELULAR)
+    // =========================================================================
+    function updateActiveButtonsAndTags() {
+      // Botones inferiores de piso
+      document.querySelectorAll('.floor-btn').forEach(btn => {
+        const isAct = Number(btn.dataset.floor) === state.selectedLevel;
+        btn.classList.toggle('active', isAct);
+      });
+
+      // Ítems en escritorio, chips móviles y drawer móvil
+      document.querySelectorAll('[data-stand-id]').forEach(el => {
+        el.classList.toggle('active', el.dataset.standId === state.selectedStandId);
+      });
+
+      // Etiquetas 3D flotantes
+      standLabelElements.forEach(({ stand, el }) => {
+        const isAct = stand.id === state.selectedStandId;
+        el.classList.toggle('stand-selected', isAct);
+        if (isAct) {
+          el.style.borderColor = stand.borderColor || stand.color;
+          el.style.boxShadow = `0 0 18px ${stand.color}70, 0 8px 22px rgba(0,0,0,0.75)`;
+        } else {
+          el.style.borderColor = `${stand.color}85`;
+          el.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.55)';
+        }
+      });
+    }
+
+    function setMobileDrawerOpen(open) {
+      state.mobileDrawerOpen = open;
+      document.getElementById('mobile-stands-drawer').classList.toggle('hidden', !open);
+      document.getElementById('mobile-drawer-backdrop').classList.toggle('hidden', !open);
+    }
+
+    function renderFloorUI() {
+      // A. Elementos de escritorio
+      const desktopCard = document.getElementById('floor-panel-card');
+      const titleEl = document.getElementById('floor-panel-title');
+      const subtitleEl = document.getElementById('floor-panel-subtitle');
+      const dotEl = document.getElementById('floor-panel-dot');
+      const listEl = document.getElementById('floor-stands-list');
+      const selCard = document.getElementById('selected-stand-card');
+
+      // B. Elementos de celular
+      const mobileBar = document.getElementById('mobile-floor-bar');
+      const mobileChipsView = document.getElementById('mobile-chips-view');
+      const mobileChipsWrap = document.getElementById('mobile-stands-chips');
+      const mobileStandDetail = document.getElementById('mobile-stand-detail');
+      const mobileDrawerCount = document.getElementById('mobile-drawer-count');
+      const mobileDrawerDot = document.getElementById('mobile-drawer-dot');
+      const mobileDrawerTitle = document.getElementById('mobile-drawer-title');
+      const mobileDrawerList = document.getElementById('mobile-drawer-list');
+
+      if (state.selectedLevel === -1) {
+        desktopCard.classList.add('hidden');
+        mobileBar.classList.add('hidden');
+        setMobileDrawerOpen(false);
+        return;
+      }
+
+      const lvlMeta = LEVELS_META[state.selectedLevel];
+      const floorStands = STANDS_DATA.filter(s => s.level === state.selectedLevel);
+      const cleanTitle = state.selectedLevel === 3 ? 'Entrepiso (s/ 1° Piso)' : lvlMeta.name.replace(' (3 Cotas)', '');
+
+      // --- 1. Render Escritorio ---
+      desktopCard.classList.remove('hidden');
+      titleEl.textContent = cleanTitle;
+      subtitleEl.textContent = `${floorStands.length} ${floorStands.length === 1 ? 'stand en este piso' : 'stands en este piso'} · Tocá uno para enfocar`;
+      dotEl.style.backgroundColor = lvlMeta.color;
+      dotEl.style.boxShadow = `0 0 8px ${lvlMeta.color}`;
+
+      listEl.innerHTML = '';
+      floorStands.forEach(stand => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.standId = stand.id;
+        btn.className = 'stand-list-item w-full text-left px-2.5 py-2.5 rounded-xl border border-slate-700/55 bg-slate-900/55 flex items-center gap-2.5';
+        btn.innerHTML = `
+          <span class="w-3.5 h-3.5 rounded-md shrink-0 border border-white/25" style="background:${stand.color};box-shadow:0 0 8px ${stand.color}55"></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-medium text-slate-100 truncate">${stand.name}</div>
+            <div class="text-[10px] text-slate-400 truncate">${stand.rooms}</div>
+          </div>
+        `;
+        btn.addEventListener('click', () => {
+          if (state.selectedStandId === stand.id) {
+            selectFloor(state.selectedLevel, true);
+          } else {
+            selectStand(stand.id, true);
+          }
+        });
+        listEl.appendChild(btn);
+      });
+
+      if (state.selectedStandId) {
+        const stand = STANDS_DATA.find(s => s.id === state.selectedStandId);
+        if (stand) {
+          selCard.classList.remove('hidden');
+          const sw = document.getElementById('sel-stand-swatch');
+          sw.style.backgroundColor = stand.color;
+          sw.style.boxShadow = `0 0 8px ${stand.color}`;
+          document.getElementById('sel-stand-name').textContent = stand.name;
+          document.getElementById('sel-stand-rooms').textContent = `Ubicación: ${stand.floorGroup} — ${stand.rooms}.`;
+        }
+      } else {
+        selCard.classList.add('hidden');
+      }
+
+      // --- 2. Render Celular ---
+      mobileBar.classList.remove('hidden');
+      mobileDrawerCount.textContent = `Lista (${floorStands.length})`;
+      mobileDrawerDot.style.backgroundColor = lvlMeta.color;
+      mobileDrawerDot.style.boxShadow = `0 0 8px ${lvlMeta.color}`;
+      mobileDrawerTitle.textContent = `${cleanTitle} · ${floorStands.length} ${floorStands.length === 1 ? 'stand' : 'stands'}`;
+
+      // Chips horizontales rápidos
+      mobileChipsWrap.innerHTML = '';
+      mobileDrawerList.innerHTML = '';
+      floorStands.forEach(stand => {
+        // Chip horizontal
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.dataset.standId = stand.id;
+        chip.className = 'stand-chip shrink-0 h-10 px-3 rounded-xl border border-slate-700/70 bg-slate-900/75 text-slate-100 text-xs font-medium flex items-center gap-2 active:scale-95';
+        chip.innerHTML = `
+          <span class="w-3 h-3 rounded-full shrink-0 border border-white/30" style="background:${stand.color};box-shadow:0 0 7px ${stand.color}70"></span>
+          <span class="max-w-[160px] truncate">${stand.name}</span>
+        `;
+        chip.addEventListener('click', () => selectStand(stand.id, true));
+        mobileChipsWrap.appendChild(chip);
+
+        // Fila grande en Drawer móvil (mínimo 48px de alto para tap perfecto)
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.dataset.standId = stand.id;
+        row.className = 'stand-list-item w-full min-h-[50px] text-left px-3 py-2.5 rounded-xl border border-slate-700/55 bg-slate-900/65 flex items-center gap-3 active:scale-[0.99]';
+        row.innerHTML = `
+          <span class="w-4 h-4 rounded-md shrink-0 border border-white/30" style="background:${stand.color};box-shadow:0 0 9px ${stand.color}60"></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-semibold text-slate-100 leading-snug">${stand.name}</div>
+            <div class="text-[11px] text-slate-400 leading-snug mt-0.5">${stand.rooms}</div>
+          </div>
+        `;
+        row.addEventListener('click', () => {
+          setMobileDrawerOpen(false);
+          selectStand(stand.id, true);
+        });
+        mobileDrawerList.appendChild(row);
+      });
+
+      if (state.selectedStandId) {
+        const stand = STANDS_DATA.find(s => s.id === state.selectedStandId);
+        if (stand) {
+          mobileChipsView.classList.add('hidden');
+          mobileStandDetail.classList.remove('hidden');
+          const mSw = document.getElementById('mob-stand-swatch');
+          mSw.style.backgroundColor = stand.color;
+          mSw.style.boxShadow = `0 0 8px ${stand.color}`;
+          document.getElementById('mob-stand-name').textContent = stand.name;
+          document.getElementById('mob-stand-rooms').textContent = stand.rooms;
+
+          const showNavArrows = floorStands.length > 1;
+          document.getElementById('btn-mob-prev-stand').classList.toggle('hidden', !showNavArrows);
+          document.getElementById('btn-mob-next-stand').classList.toggle('hidden', !showNavArrows);
+        }
+      } else {
+        mobileStandDetail.classList.add('hidden');
+        mobileChipsView.classList.remove('hidden');
+      }
+
+      updateActiveButtonsAndTags();
+    }
+
+    function selectFloor(levelIdx, moveCamera = true) {
+      if (levelIdx !== -1 && !STAND_FLOOR_INDICES.includes(levelIdx)) return;
+
+      dismissTouchHint();
+      setMobileDrawerOpen(false);
+      state.selectedLevel = levelIdx;
+      state.selectedStandId = null;
+
+      updateVisualMaterials();
+      renderFloorUI();
+      updateActiveButtonsAndTags();
+
+      if (moveCamera) {
+        const view = FLOOR_VIEWS[String(levelIdx)];
+        if (view) animateCameraTo(view.pos, view.target, false);
+      }
+    }
+
+    function selectStand(standId, moveCamera = true) {
+      const stand = STANDS_DATA.find(s => s.id === standId);
+      if (!stand) return;
+
+      dismissTouchHint();
+      setMobileDrawerOpen(false);
+      state.selectedLevel = stand.level;
+      state.selectedStandId = stand.id;
+
+      if (state.floorPanelCollapsed) {
+        state.floorPanelCollapsed = false;
+        document.getElementById('floor-panel-body').classList.remove('hidden');
+        document.getElementById('btn-collapse-floor-panel').textContent = '−';
+      }
+
+      updateVisualMaterials();
+      renderFloorUI();
+      updateActiveButtonsAndTags();
+
+      if (moveCamera && stand.camPos && stand.camTarget) {
+        animateCameraTo(stand.camPos, stand.camTarget, true);
+      }
+    }
+
+    function stepStandOnActiveFloor(delta) {
+      if (state.selectedLevel === -1) return;
+      const floorStands = STANDS_DATA.filter(s => s.level === state.selectedLevel);
+      if (floorStands.length < 2) return;
+      const idx = floorStands.findIndex(s => s.id === state.selectedStandId);
+      const nextIdx = (idx === -1) ? 0 : (idx + delta + floorStands.length) % floorStands.length;
+      selectStand(floorStands[nextIdx].id, true);
+    }
+
+    // =========================================================================
+    // 13. ETIQUETAS 3D PROYECTADAS (SOLO STANDS DEL PISO ACTIVO)
+    // =========================================================================
+    function initLabels() {
+      const layer = document.getElementById('labels-layer');
+      layer.innerHTML = '';
+      standLabelElements = [];
+
+      STANDS_DATA.forEach(stand => {
+        stand.labels.forEach(lbl => {
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'stand-tag-3d';
+          el.style.borderColor = `${stand.color}85`;
+          el.innerHTML = `
+            <span class="stand-tag-dot" style="background:${stand.color};color:${stand.color}"></span>
+            <span class="stand-tag-label">${lbl.label}</span>
+          `;
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (state.selectedStandId === stand.id) {
+              selectFloor(stand.level, true);
+            } else {
+              selectStand(stand.id, true);
+            }
+          });
+          layer.appendChild(el);
+          standLabelElements.push({ stand, lbl, el });
+        });
+      });
+    }
+
+    function projectLabels() {
+      const w = renderer.domElement.clientWidth;
+      const h = renderer.domElement.clientHeight;
+      const isMobile = w < 768;
+      const padX = isMobile ? 64 : 80;
+      const minY = isMobile ? 76 : 72;
+      const maxY = isMobile ? h - 138 : h - 86;
+      const v = new THREE.Vector3();
+
+      standLabelElements.forEach(({ stand, lbl, el }) => {
+        if (state.selectedLevel === -1 || stand.level !== state.selectedLevel) {
+          el.style.display = 'none';
+          return;
+        }
+
+        v.set(lbl.x + BLDG_OFFSET_X, lbl.y, lbl.z + BLDG_OFFSET_Z);
+        v.project(camera);
+
+        if (v.z > 1 || v.x < -1.06 || v.x > 1.06 || v.y < -1.06 || v.y > 1.06) {
+          el.style.display = 'none';
+          return;
+        }
+
+        const rawX = (v.x * 0.5 + 0.5) * w;
+        const rawY = (-v.y * 0.5 + 0.5) * h;
+
+        // Ocultar suavemente si queda fuera de la zona despejada entre encabezado y dock inferior
+        if (rawY < minY - 24 || rawY > maxY + 30) {
+          el.style.display = 'none';
+          return;
+        }
+
+        const clampedX = Math.max(padX, Math.min(w - padX, rawX));
+        const clampedY = Math.max(minY, Math.min(maxY, rawY));
+
+        el.style.display = 'inline-flex';
+        el.style.left = clampedX + 'px';
+        el.style.top = clampedY + 'px';
+        el.style.opacity = (!state.selectedStandId || state.selectedStandId === stand.id) ? '0.98' : '0.26';
+      });
+    }
+
+    // =========================================================================
+    // 14. BUSCADOR RÁPIDO DE STANDS (OPTIMIZADO PARA CELULAR Y ESCRITORIO)
+    // =========================================================================
+    function setSearchOpen(open) {
+      state.searchOpen = open;
+      const pop = document.getElementById('search-popover');
+      const backdrop = document.getElementById('search-backdrop');
+      pop.classList.toggle('hidden', !open);
+      backdrop.classList.toggle('hidden', !open);
+      if (open) {
+        setMobileDrawerOpen(false);
+        const input = document.getElementById('stand-search');
+        renderSearchResults(input.value);
+        setTimeout(() => input.focus(), 40);
+      } else {
+        document.getElementById('stand-search').blur();
+      }
+    }
+
+    function renderSearchResults(filterText = '') {
+      const container = document.getElementById('search-results');
+      const q = filterText.trim().toLowerCase();
+
+      const filtered = STANDS_DATA.filter(s => {
+        if (!q) return true;
+        return (
+          s.name.toLowerCase().includes(q) ||
+          s.floorGroup.toLowerCase().includes(q) ||
+          s.rooms.toLowerCase().includes(q)
+        );
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-6 text-xs text-slate-400">No se encontraron stands para "${filterText}".</div>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      filtered.forEach(stand => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'stand-list-item w-full min-h-[48px] text-left px-3 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/65 flex items-center gap-3 active:scale-[0.99]';
+        const floorShortLabel = stand.level === 3 ? 'Entrepiso' : stand.floorGroup;
+        btn.innerHTML = `
+          <span class="w-3.5 h-3.5 rounded-md shrink-0 border border-white/30" style="background:${stand.color};box-shadow:0 0 8px ${stand.color}55"></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-semibold text-slate-100 truncate">${stand.name}</div>
+            <div class="text-[11px] text-slate-400 truncate">${floorShortLabel} · ${stand.rooms}</div>
+          </div>
+        `;
+        btn.addEventListener('click', () => {
+          setSearchOpen(false);
+          selectStand(stand.id, true);
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    // =========================================================================
+    // 15. INICIALIZACIÓN DE INTERFAZ Y EVENTOS
+    // =========================================================================
+    function initUI() {
+      // Botones principales de pisos (Edificio, PB, 1° Piso, Entrepiso, 2° Piso)
+      document.querySelectorAll('.floor-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetFloor = Number(btn.dataset.floor);
+          selectFloor(targetFloor, true);
+        });
+      });
+
+      // Botón "Centrar vista"
+      document.getElementById('btn-reset-view').addEventListener('click', () => {
+        dismissTouchHint();
+        resetCurrentCameraView();
+      });
+
+      // Escritorio: "Ver todo el piso" y colapsar panel derecho
+      document.getElementById('btn-deselect-stand').addEventListener('click', () => {
+        if (state.selectedLevel !== -1) selectFloor(state.selectedLevel, true);
+      });
+
+      const btnCollapse = document.getElementById('btn-collapse-floor-panel');
+      btnCollapse.addEventListener('click', () => {
+        state.floorPanelCollapsed = !state.floorPanelCollapsed;
+        document.getElementById('floor-panel-body').classList.toggle('hidden', state.floorPanelCollapsed);
+        btnCollapse.textContent = state.floorPanelCollapsed ? '+' : '−';
+      });
+
+      // Celular: Drawer de lista completa y controles de ficha de stand
+      document.getElementById('btn-open-mobile-drawer').addEventListener('click', () => {
+        setMobileDrawerOpen(true);
+      });
+      document.getElementById('btn-close-mobile-drawer').addEventListener('click', () => {
+        setMobileDrawerOpen(false);
+      });
+      document.getElementById('mobile-drawer-backdrop').addEventListener('click', () => {
+        setMobileDrawerOpen(false);
+      });
+      document.getElementById('btn-mob-deselect').addEventListener('click', () => {
+        if (state.selectedLevel !== -1) selectFloor(state.selectedLevel, true);
+      });
+      document.getElementById('btn-mob-prev-stand').addEventListener('click', () => {
+        stepStandOnActiveFloor(-1);
+      });
+      document.getElementById('btn-mob-next-stand').addEventListener('click', () => {
+        stepStandOnActiveFloor(1);
+      });
+
+      // Buscador rápido
+      const btnToggleSearch = document.getElementById('btn-toggle-search');
+      const searchInput = document.getElementById('stand-search');
+      const clearSearchBtn = document.getElementById('btn-clear-search');
+      const closeSearchBtn = document.getElementById('btn-close-search');
+      const searchBackdrop = document.getElementById('search-backdrop');
+
+      btnToggleSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setSearchOpen(!state.searchOpen);
+      });
+      closeSearchBtn.addEventListener('click', () => setSearchOpen(false));
+      searchBackdrop.addEventListener('click', () => setSearchOpen(false));
+
+      searchInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        clearSearchBtn.classList.toggle('hidden', val.length === 0);
+        renderSearchResults(val);
+      });
+      clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchBtn.classList.add('hidden');
+        renderSearchResults('');
+        searchInput.focus();
+      });
+
+      // Ocultar ayuda táctil automáticamente tras 6 segundos
+      setTimeout(dismissTouchHint, 6000);
+    }
+
+    // =========================================================================
+    // 16. INICIALIZACIÓN DE ESCENA THREE.JS Y BUCLE DE RENDERIZADO
+    // =========================================================================
+    function initScene() {
+      const container = document.getElementById('canvas-container');
+      const isMobile = window.innerWidth < 768;
+      const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x0b101b, 0.0034);
+
+      camera = new THREE.PerspectiveCamera(aspect < 0.95 ? 48 : 42, aspect, 0.4, 460);
+      const initialPose = getResponsiveCameraPose(FLOOR_VIEWS['-1'].pos, FLOOR_VIEWS['-1'].target, false);
+      camera.position.copy(initialPose.pos);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+      container.appendChild(renderer.domElement);
+
+      if (typeof THREE.OrbitControls === 'function') {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.rotateSpeed = isMobile ? 0.72 : 0.88;
+        controls.zoomSpeed = isMobile ? 0.9 : 1.0;
+        controls.panSpeed = 0.85;
+        controls.minDistance = 10;
+        controls.maxDistance = 195;
+        controls.maxPolarAngle = Math.PI * 0.495;
+        if (THREE.TOUCH) {
+          controls.touches = {
+            ONE: THREE.TOUCH.ROTATE,
+            TWO: THREE.TOUCH.DOLLY_PAN
+          };
+        }
+        controls.target.copy(initialPose.target);
+        controls.update();
+      } else {
+        controls = new FallbackOrbitControls(camera, renderer.domElement);
+        controls.target.copy(initialPose.target);
+      }
+
+      // Iluminación de estudio arquitectónico
+      const hemi = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.78);
+      hemi.position.set(0, 60, 0);
+      scene.add(hemi);
+
+      const sun = new THREE.DirectionalLight(0xfff7ed, 1.18);
+      sun.position.set(-48, 72, 42);
+      sun.castShadow = true;
+      const shadowRes = isMobile ? 1024 : 2048;
+      sun.shadow.mapSize.width = shadowRes;
+      sun.shadow.mapSize.height = shadowRes;
+      sun.shadow.camera.near = 10;
+      sun.shadow.camera.far = 210;
+      sun.shadow.camera.left = -64;
+      sun.shadow.camera.right = 54;
+      sun.shadow.camera.top = 48;
+      sun.shadow.camera.bottom = -48;
+      sun.shadow.bias = -0.0006;
+      scene.add(sun);
+
+      const fill = new THREE.DirectionalLight(0x7dd3fc, 0.45);
+      fill.position.set(55, 34, -45);
+      scene.add(fill);
+
+      const lightHall = new THREE.PointLight(0xffedd5, 0.55, 22);
+      lightHall.position.set(BLDG_OFFSET_X + 8.5, 4.2, BLDG_OFFSET_Z + 7.5);
+      scene.add(lightHall);
+
+      const lightPulmon = new THREE.PointLight(0xe0f2fe, 0.65, 28);
+      lightPulmon.position.set(BLDG_OFFSET_X + 47.0, 10.5, BLDG_OFFSET_Z + 7.2);
+      scene.add(lightPulmon);
+
+      // Entorno urbano de Calle Perú
+      buildSiteBase();
+
+      // Edificio de 7 niveles
+      buildingRoot = new THREE.Group();
+      buildingRoot.position.set(BLDG_OFFSET_X, 0, BLDG_OFFSET_Z);
+      scene.add(buildingRoot);
+
+      const builders = [buildPB, buildEPPB, build1P, buildEP1P, build2P, build3P, buildEP3P];
+      builders.forEach((fn, idx) => {
+        const pal = createLevelPalette();
+        const grp = new THREE.Group();
+        grp.name = LEVELS_META[idx].code;
+        levelPalettes.push(pal);
+        levelGroups.push(grp);
+        fn(grp, pal);
+        buildingRoot.add(grp);
+      });
+
+      // Prismas 3D de Stands de Exposición
+      buildStands();
+
+      // Raycasting táctil + mouse: solo seleccionables los stands del piso activo
+      raycaster = new THREE.Raycaster();
+      pointer = new THREE.Vector2();
+
+      const getVisibleStandHit = (clientX, clientY) => {
+        if (state.selectedLevel === -1) return null;
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+
+        const hits = raycaster.intersectObjects(standClickableMeshes, false);
+        return hits.find(h => {
+          const sId = h.object.userData.standId;
+          return standVisuals[sId] && standVisuals[sId].group.visible;
+        }) || null;
+      };
+
+      renderer.domElement.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
+        const hit = getVisibleStandHit(e.clientX, e.clientY);
+        container.classList.toggle('hover-stand', !!hit);
+      });
+
+      renderer.domElement.addEventListener('pointerdown', (e) => {
+        dismissTouchHint();
+        state.activePointers.add(e.pointerId);
+        if (state.activePointers.size > 1) {
+          state.wasMultiTouch = true;
+        } else {
+          state.wasMultiTouch = false;
+          state.pointerDownPos.x = e.clientX;
+          state.pointerDownPos.y = e.clientY;
+        }
+        state.camAnim = null;
+      });
+
+      const handlePointerEnd = (e) => {
+        const wasMulti = state.wasMultiTouch || state.activePointers.size > 1;
+        state.activePointers.delete(e.pointerId);
+        if (state.activePointers.size === 0) {
+          state.wasMultiTouch = false;
+        }
+
+        if (e.type !== 'pointerup' || wasMulti) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+        // Tolerancia de movimiento más generosa para el dedo en pantallas táctiles
+        const maxTapDrift = e.pointerType === 'touch' ? 14 : 6;
+        const dist = Math.hypot(e.clientX - state.pointerDownPos.x, e.clientY - state.pointerDownPos.y);
+        if (dist > maxTapDrift) return;
+
+        const visibleStandHit = getVisibleStandHit(e.clientX, e.clientY);
+        if (visibleStandHit) {
+          const sId = visibleStandHit.object.userData.standId;
+          if (state.selectedStandId === sId) {
+            selectFloor(state.selectedLevel, true);
+          } else {
+            selectStand(sId, true);
+          }
+        }
+      };
+
+      renderer.domElement.addEventListener('pointerup', handlePointerEnd);
+      renderer.domElement.addEventListener('pointercancel', handlePointerEnd);
+
+      const handleResize = () => {
+        const w = window.innerWidth;
+        const h = Math.max(window.innerHeight, 1);
+        const asp = w / h;
+        camera.fov = asp < 0.95 ? 48 : 42;
+        camera.aspect = asp;
+        camera.updateProjectionMatrix();
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, w < 768 ? 1.5 : 2));
+        renderer.setSize(w, h);
+      };
+
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          handleResize();
+          resetCurrentCameraView();
+        }, 180);
+      });
+
+      initUI();
+      initLabels();
+      updateVisualMaterials();
+      animate();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      animClock += 0.04;
+
+      if (state.selectedStandId && standVisuals[state.selectedStandId]) {
+        const vis = standVisuals[state.selectedStandId];
+        if (vis.group.visible) {
+          vis.bodyMat.emissiveIntensity = 0.62 + Math.sin(animClock * 1.4) * 0.16;
+        }
+      }
+
+      if (state.camAnim) {
+        state.camAnim.t = Math.min(1, state.camAnim.t + 0.052);
+        const ease = 1 - Math.pow(1 - state.camAnim.t, 3);
+        camera.position.lerpVectors(state.camAnim.startPos, state.camAnim.endPos, ease);
+        controls.target.lerpVectors(state.camAnim.startTarget, state.camAnim.endTarget, ease);
+        if (state.camAnim.t >= 1) state.camAnim = null;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+      projectLabels();
+    }
+
+    window.onload = function () {
+      try {
+        if (typeof THREE === 'undefined') {
+          document.body.innerHTML = '<div style="padding:40px;color:#fff">Error al cargar Three.js desde CDN. Verificá tu conexión a internet.</div>';
+          return;
+        }
+        initScene();
+      } catch (err) {
+        console.error('Error al inicializar la maqueta 3D:', err);
+        document.body.innerHTML = '<div style="padding:40px;color:#f87171;font-family:monospace">Error al inicializar la escena 3D: ' + String(err.message || err) + '</div>';
+      }
+    };
+  })();
+  </script>
+</body>
+</html>
