@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Mapa 3D de Stands — Exposición Instituto Industrial Luis A. Huergo</title>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-QNMPQ4PSW8"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-QNMPQ4PSW8');
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -707,16 +715,16 @@
         floorCode: 'PB',
         shortFloor: 'PB',
         name: 'EERR / Meca / Construcciones',
-        rooms: 'Gimnasio Cubierto PB-23 (Cota +1,80 m)',
-        color: '#88abe8',
-        borderColor: '#bdd5ff',
+        rooms: 'Patio Cubierto / Gimnasio PB-23 (Cota +1,80 m)',
+        color: '#93b0e3',
+        borderColor: '#c7d9fa',
         prisms: [
-          { x: 14.0, y: 1.84, z: -15.25, w: 26.0, h: 3.10, d: 14.35 }
+          { x: 13.80, y: 1.84, z: -15.60, w: 26.40, h: 3.10, d: 15.20 }
         ],
         labels: [
           { x: 27.0, y: 5.25, z: -8.0, label: 'EERR / Meca / Construcciones' }
         ],
-        camPos: [-8, 22, -32],
+        camPos: [-26, 22, -30],
         camTarget: [-5, 3.2, -7.5]
       },
 
@@ -1534,12 +1542,10 @@
       const H = 2.80;
 
       const holeMarble = { x: 3.4, z: 5.5, w: 9.2, d: 4.0 };
-      const holePatioLuz = { x: 17.0, z: 3.2, w: 5.4, d: 4.8 };
       const holePulmon = { x: 45.8, z: 5.0, w: 7.4, d: 4.2 };
-      addSlabWithHoles(g, L, 0, 0, 64.0, 15.0, Y, 0.26, [holeMarble, holePatioLuz, holePulmon], p.slabTerrazzo);
+      addSlabWithHoles(g, L, 0, 0, 64.0, 15.0, Y, 0.26, [holeMarble, holePulmon], p.slabTerrazzo);
 
       addHoleRailings(g, L, holeMarble, Y, p.railingIron, { E: true });
-      addHoleRailings(g, L, holePatioLuz, Y, p.railingIron);
       addHoleRailings(g, L, holePulmon, Y, p.railingIron);
 
       addMainFacadeBand(g, L, Y, H, p);
@@ -1550,7 +1556,17 @@
       addBox(g, L, 25.5, Y, 0, 15.0, H, 0.24, p.wall);
       addWindowWall(g, L, 44.0, 0, 63.74, 0, Y, H, 1.0, 2.4, 5, p, p.wall);
 
-      addBox(g, L, 3.4, Y, 0.24, 0.18, H, 4.6, p.wallInterior);
+      // Ambiente cubierto en L (1P-04, 1P-05, 1P-09, 1P-12, 1P-13 y 1P-14)
+      addBox(g, L, 3.4, Y, 0.24, 0.18, H, 3.94, p.wallInterior);
+      addBox(g, L, 3.4, Y, 4.0, 13.78, H, 0.18, p.wallInterior);
+      addBox(g, L, 17.0, Y, 4.0, 0.18, H, 4.2, p.wallInterior);
+      addBox(g, L, 17.0, Y, 8.02, 5.8, H, 0.18, p.wallInterior);
+      addBox(g, L, 22.62, Y, 0.24, 0.18, H, 7.96, p.wallInterior);
+      // Divisiones interiores del bloque cubierto (1P-04/05, 1P-09, 1P-12 y 1P-14)
+      addBox(g, L, 12.6, Y, 0.24, 0.18, H, 3.76, p.wallInterior);
+      addBox(g, L, 17.0, Y, 0.24, 0.18, H, 3.76, p.wallInterior);
+      addBox(g, L, 17.18, Y, 4.0, 5.44, H, 0.18, p.wallInterior);
+
       addBox(g, L, 3.4, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
       addBox(g, L, 12.6, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
       addBox(g, L, 17.0, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
@@ -1610,12 +1626,10 @@
       const Y = 8.40;
       const H = 2.80;
 
-      const holeWest = { x: 6.0, z: 3.6, w: 10.2, d: 6.4 };
       const holeMid = { x: 21.0, z: 3.6, w: 6.0, d: 4.2 };
       const holePulmon = { x: 35.0, z: 3.8, w: 18.0, d: 5.8 };
-      addSlabWithHoles(g, L, 0, 0, 64.0, 15.0, Y, 0.25, [holeWest, holeMid, holePulmon], p.slab);
+      addSlabWithHoles(g, L, 0, 0, 64.0, 15.0, Y, 0.25, [holeMid, holePulmon], p.slab);
 
-      addHoleRailings(g, L, holeWest, Y, p.railingIron);
       addHoleRailings(g, L, holeMid, Y, p.railingIron);
       addHoleRailings(g, L, holePulmon, Y, p.railingIron);
 
@@ -1627,13 +1641,19 @@
 
       addBox(g, L, 5.8, Y, 0.24, 0.20, H, 14.5, p.wallInterior);
 
-      [16.2, 21.0, 27.0, 34.5, 53.5, 58.8].forEach(wx => {
+      // Dos aulas cubiertas al Norte del pasillo (x = 5.8..21.0, z = 0.24..7.6)
+      addBox(g, L, 14.2, Y, 0.24, 0.18, H, 7.36, p.wallInterior);
+      addBox(g, L, 21.0, Y, 0.24, 0.18, H, 7.36, p.wallInterior);
+      addWindowWall(g, L, 5.8, 7.6, 21.0, 7.6, Y, H, 1.05, 2.35, 4, p, p.wallInterior);
+
+      [27.0, 34.5, 53.5, 58.8].forEach(wx => {
         addBox(g, L, wx, Y, 0.24, 0.18, H, 3.4, p.wallInterior);
       });
       [10.2, 21.0, 34.5, 48.0, 54.0].forEach(wx => {
         addBox(g, L, wx, Y, 10.2, 0.18, H, 4.54, p.wallInterior);
       });
-      addWindowWall(g, L, 16.2, 10.2, 54.0, 10.2, Y, H, 1.05, 2.35, 9, p, p.wallInterior);
+      // Pasillo longitudinal continuo delimitado también por el muro Sur hasta x = 5.8
+      addWindowWall(g, L, 5.8, 10.2, 54.0, 10.2, Y, H, 1.05, 2.35, 11, p, p.wallInterior);
 
       addStairFlight(g, L, {
         x: 50.8, yStart: Y, z: 11.4, run: 4.4, rise: 2.80, width: 1.5, steps: 14, dir: '+X',
@@ -2463,8 +2483,8 @@
     // =========================================================================
     const FLOOR_VIEWS = {
       '-1': { pos: [-58, 30, 42], target: [-6, 6.8, 0] },
-      '0':  { pos: [-34, 42, 36], target: [-9, 1.5, 0.5] },
-      '2':  { pos: [-24, 38, 38], target: [-4, 6.5, 4.5] },
+      '0':  { pos: [-34, 44, 42], target: [-8, 1.5, -1.0] },
+      '2':  { pos: [-22, 38, 40], target: [-6, 6.8, 9.0] },
       '3':  { pos: [4, 38, 40],   target: [5, 9.5, 7.5] },
       '4':  { pos: [-16, 44, 44], target: [-5, 12.5, 7.5] }
     };
@@ -2706,13 +2726,21 @@
       state.selectedLevel = levelIdx;
       state.selectedStandId = null;
 
+      if (typeof gtag === 'function') {
+        const floorLabel = levelIdx === -1 ? 'Edificio Completo' : (LEVELS_META[levelIdx] ? LEVELS_META[levelIdx].name : String(levelIdx));
+        gtag('event', 'ver_piso', {
+          piso_id: String(levelIdx),
+          piso_nombre: floorLabel
+        });
+      }
+
       updateVisualMaterials();
       renderFloorUI();
       updateActiveButtonsAndTags();
 
       if (moveCamera) {
-        const view = FLOOR_VIEWS[String(levelIdx)];
-        if (view) animateCameraTo(view.pos, view.target, false);
+        const view = FLOOR_VIEWS[String(levelIdx)] || FLOOR_VIEWS['-1'];
+        animateCameraTo(view.pos, view.target, false);
       }
     }
 
@@ -2725,10 +2753,20 @@
       state.selectedLevel = stand.level;
       state.selectedStandId = stand.id;
 
+      if (typeof gtag === 'function') {
+        gtag('event', 'ver_stand', {
+          stand_id: stand.id,
+          stand_nombre: stand.name,
+          stand_piso: stand.floorGroup
+        });
+      }
+
       if (state.floorPanelCollapsed) {
         state.floorPanelCollapsed = false;
-        document.getElementById('floor-panel-body').classList.remove('hidden');
-        document.getElementById('btn-collapse-floor-panel').textContent = '−';
+        const bodyEl = document.getElementById('floor-panel-body');
+        const colBtn = document.getElementById('btn-collapse-floor-panel');
+        if (bodyEl) bodyEl.classList.remove('hidden');
+        if (colBtn) colBtn.textContent = '−';
       }
 
       updateVisualMaterials();
@@ -2740,25 +2778,29 @@
       }
     }
 
-    function stepStandOnActiveFloor(delta) {
+    function cycleStandInActiveFloor(delta) {
       if (state.selectedLevel === -1) return;
       const floorStands = STANDS_DATA.filter(s => s.level === state.selectedLevel);
-      if (floorStands.length < 2) return;
-      const idx = floorStands.findIndex(s => s.id === state.selectedStandId);
-      const nextIdx = (idx === -1) ? 0 : (idx + delta + floorStands.length) % floorStands.length;
+      if (floorStands.length <= 1) return;
+
+      const curIdx = floorStands.findIndex(s => s.id === state.selectedStandId);
+      const nextIdx = curIdx === -1
+        ? 0
+        : (curIdx + delta + floorStands.length) % floorStands.length;
+
       selectStand(floorStands[nextIdx].id, true);
     }
 
     // =========================================================================
-    // 13. ETIQUETAS 3D PROYECTADAS (SOLO STANDS DEL PISO ACTIVO)
+    // 13. ETIQUETAS 3D FLOTANTES DE STANDS
     // =========================================================================
-    function initLabels() {
+    function initStandLabels() {
       const layer = document.getElementById('labels-layer');
       layer.innerHTML = '';
       standLabelElements = [];
 
       STANDS_DATA.forEach(stand => {
-        stand.labels.forEach(lbl => {
+        (stand.labels || []).forEach(lbl => {
           const el = document.createElement('button');
           el.type = 'button';
           el.className = 'stand-tag-3d';
@@ -2769,26 +2811,21 @@
           `;
           el.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (state.selectedStandId === stand.id) {
-              selectFloor(stand.level, true);
-            } else {
-              selectStand(stand.id, true);
-            }
+            selectStand(stand.id, true);
           });
           layer.appendChild(el);
           standLabelElements.push({ stand, lbl, el });
         });
       });
+
+      updateActiveButtonsAndTags();
     }
 
-    function projectLabels() {
+    function projectStandLabels() {
+      if (!renderer || !camera) return;
       const w = renderer.domElement.clientWidth;
       const h = renderer.domElement.clientHeight;
-      const isMobile = w < 768;
-      const padX = isMobile ? 64 : 80;
-      const minY = isMobile ? 76 : 72;
-      const maxY = isMobile ? h - 138 : h - 86;
-      const v = new THREE.Vector3();
+      const projVec = new THREE.Vector3();
 
       standLabelElements.forEach(({ stand, lbl, el }) => {
         if (state.selectedLevel === -1 || stand.level !== state.selectedLevel) {
@@ -2796,82 +2833,79 @@
           return;
         }
 
-        v.set(lbl.x + BLDG_OFFSET_X, lbl.y, lbl.z + BLDG_OFFSET_Z);
-        v.project(camera);
+        projVec.set(lbl.x + BLDG_OFFSET_X, lbl.y, lbl.z + BLDG_OFFSET_Z);
+        projVec.project(camera);
 
-        if (v.z > 1 || v.x < -1.06 || v.x > 1.06 || v.y < -1.06 || v.y > 1.06) {
+        if (projVec.z > 1 || projVec.x < -1.08 || projVec.x > 1.08 || projVec.y < -1.08 || projVec.y > 1.08) {
           el.style.display = 'none';
           return;
         }
 
-        const rawX = (v.x * 0.5 + 0.5) * w;
-        const rawY = (-v.y * 0.5 + 0.5) * h;
-
-        // Ocultar suavemente si queda fuera de la zona despejada entre encabezado y dock inferior
-        if (rawY < minY - 24 || rawY > maxY + 30) {
-          el.style.display = 'none';
-          return;
-        }
-
-        const clampedX = Math.max(padX, Math.min(w - padX, rawX));
-        const clampedY = Math.max(minY, Math.min(maxY, rawY));
-
+        const sx = (projVec.x * 0.5 + 0.5) * w;
+        const sy = (-projVec.y * 0.5 + 0.5) * h;
         el.style.display = 'inline-flex';
-        el.style.left = clampedX + 'px';
-        el.style.top = clampedY + 'px';
-        el.style.opacity = (!state.selectedStandId || state.selectedStandId === stand.id) ? '0.98' : '0.26';
+        el.style.left = sx + 'px';
+        el.style.top = sy + 'px';
+
+        const dimmed = Boolean(state.selectedStandId && state.selectedStandId !== stand.id);
+        el.style.opacity = dimmed ? '0.42' : '0.98';
       });
     }
 
     // =========================================================================
-    // 14. BUSCADOR RÁPIDO DE STANDS (OPTIMIZADO PARA CELULAR Y ESCRITORIO)
+    // 14. BUSCADOR GLOBAL DE STANDS
     // =========================================================================
+    function normalizeText(str) {
+      return (str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    }
+
     function setSearchOpen(open) {
       state.searchOpen = open;
       const pop = document.getElementById('search-popover');
       const backdrop = document.getElementById('search-backdrop');
+      const input = document.getElementById('stand-search');
       pop.classList.toggle('hidden', !open);
       backdrop.classList.toggle('hidden', !open);
+
       if (open) {
         setMobileDrawerOpen(false);
-        const input = document.getElementById('stand-search');
         renderSearchResults(input.value);
-        setTimeout(() => input.focus(), 40);
-      } else {
-        document.getElementById('stand-search').blur();
+        setTimeout(() => input.focus(), 60);
       }
     }
 
-    function renderSearchResults(filterText = '') {
+    function renderSearchResults(rawQuery) {
       const container = document.getElementById('search-results');
-      const q = filterText.trim().toLowerCase();
+      const clearBtn = document.getElementById('btn-clear-search');
+      const q = normalizeText(rawQuery.trim());
+      clearBtn.classList.toggle('hidden', q.length === 0);
 
-      const filtered = STANDS_DATA.filter(s => {
+      const matches = STANDS_DATA.filter(s => {
         if (!q) return true;
-        return (
-          s.name.toLowerCase().includes(q) ||
-          s.floorGroup.toLowerCase().includes(q) ||
-          s.rooms.toLowerCase().includes(q)
-        );
+        const hay = normalizeText(`${s.name} ${s.rooms} ${s.floorGroup} ${s.floorCode}`);
+        return hay.includes(q);
       });
 
-      if (filtered.length === 0) {
-        container.innerHTML = `<div class="text-center py-6 text-xs text-slate-400">No se encontraron stands para "${filterText}".</div>`;
+      container.innerHTML = '';
+      if (matches.length === 0) {
+        container.innerHTML = '<div class="px-3 py-4 text-center text-xs text-slate-400">No se encontraron stands con ese nombre.</div>';
         return;
       }
 
-      container.innerHTML = '';
-      filtered.forEach(stand => {
+      matches.forEach(stand => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'stand-list-item w-full min-h-[48px] text-left px-3 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/65 flex items-center gap-3 active:scale-[0.99]';
-        const floorShortLabel = stand.level === 3 ? 'Entrepiso' : stand.floorGroup;
+        btn.className = 'stand-list-item w-full min-h-[46px] text-left px-3 py-2 rounded-xl border border-slate-700/55 bg-slate-900/65 flex items-center gap-2.5';
         btn.innerHTML = `
-          <span class="w-3.5 h-3.5 rounded-md shrink-0 border border-white/30" style="background:${stand.color};box-shadow:0 0 8px ${stand.color}55"></span>
+          <span class="w-3.5 h-3.5 rounded-md shrink-0 border border-white/25" style="background:${stand.color};box-shadow:0 0 8px ${stand.color}55"></span>
           <div class="min-w-0 flex-1">
             <div class="text-xs font-semibold text-slate-100 truncate">${stand.name}</div>
-            <div class="text-[11px] text-slate-400 truncate">${floorShortLabel} · ${stand.rooms}</div>
+            <div class="text-[10px] text-slate-400 truncate">${stand.floorGroup} · ${stand.rooms}</div>
           </div>
+          <span class="px-1.5 py-0.5 rounded-md bg-slate-800/90 border border-slate-700/70 text-[10px] font-mono text-sky-200 shrink-0">${stand.shortFloor}</span>
         `;
         btn.addEventListener('click', () => {
           setSearchOpen(false);
@@ -2882,36 +2916,49 @@
     }
 
     // =========================================================================
-    // 15. INICIALIZACIÓN DE INTERFAZ Y EVENTOS
+    // 15. CONEXIÓN DE CONTROLES UI
     // =========================================================================
     function initUI() {
-      // Botones principales de pisos (Edificio, PB, 1° Piso, Entrepiso, 2° Piso)
+      // Botones inferiores de pisos
       document.querySelectorAll('.floor-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const targetFloor = Number(btn.dataset.floor);
-          selectFloor(targetFloor, true);
+          selectFloor(Number(btn.dataset.floor), true);
         });
       });
 
-      // Botón "Centrar vista"
+      // Botón Centrar Vista
       document.getElementById('btn-reset-view').addEventListener('click', () => {
         dismissTouchHint();
         resetCurrentCameraView();
       });
 
-      // Escritorio: "Ver todo el piso" y colapsar panel derecho
-      document.getElementById('btn-deselect-stand').addEventListener('click', () => {
-        if (state.selectedLevel !== -1) selectFloor(state.selectedLevel, true);
+      // Buscador
+      document.getElementById('btn-toggle-search').addEventListener('click', () => {
+        dismissTouchHint();
+        setSearchOpen(!state.searchOpen);
+      });
+      document.getElementById('btn-close-search').addEventListener('click', () => setSearchOpen(false));
+      document.getElementById('search-backdrop').addEventListener('click', () => setSearchOpen(false));
+
+      const searchInput = document.getElementById('stand-search');
+      searchInput.addEventListener('input', (e) => renderSearchResults(e.target.value));
+      document.getElementById('btn-clear-search').addEventListener('click', () => {
+        searchInput.value = '';
+        renderSearchResults('');
+        searchInput.focus();
       });
 
-      const btnCollapse = document.getElementById('btn-collapse-floor-panel');
-      btnCollapse.addEventListener('click', () => {
+      // Panel derecho (escritorio)
+      document.getElementById('btn-collapse-floor-panel').addEventListener('click', () => {
         state.floorPanelCollapsed = !state.floorPanelCollapsed;
         document.getElementById('floor-panel-body').classList.toggle('hidden', state.floorPanelCollapsed);
-        btnCollapse.textContent = state.floorPanelCollapsed ? '+' : '−';
+        document.getElementById('btn-collapse-floor-panel').textContent = state.floorPanelCollapsed ? '+' : '−';
+      });
+      document.getElementById('btn-deselect-stand').addEventListener('click', () => {
+        selectFloor(state.selectedLevel, true);
       });
 
-      // Celular: Drawer de lista completa y controles de ficha de stand
+      // Drawer y controles móviles
       document.getElementById('btn-open-mobile-drawer').addEventListener('click', () => {
         setMobileDrawerOpen(true);
       });
@@ -2921,60 +2968,40 @@
       document.getElementById('mobile-drawer-backdrop').addEventListener('click', () => {
         setMobileDrawerOpen(false);
       });
-      document.getElementById('btn-mob-deselect').addEventListener('click', () => {
-        if (state.selectedLevel !== -1) selectFloor(state.selectedLevel, true);
-      });
       document.getElementById('btn-mob-prev-stand').addEventListener('click', () => {
-        stepStandOnActiveFloor(-1);
+        cycleStandInActiveFloor(-1);
       });
       document.getElementById('btn-mob-next-stand').addEventListener('click', () => {
-        stepStandOnActiveFloor(1);
+        cycleStandInActiveFloor(1);
+      });
+      document.getElementById('btn-mob-deselect').addEventListener('click', () => {
+        selectFloor(state.selectedLevel, true);
       });
 
-      // Buscador rápido
-      const btnToggleSearch = document.getElementById('btn-toggle-search');
-      const searchInput = document.getElementById('stand-search');
-      const clearSearchBtn = document.getElementById('btn-clear-search');
-      const closeSearchBtn = document.getElementById('btn-close-search');
-      const searchBackdrop = document.getElementById('search-backdrop');
-
-      btnToggleSearch.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setSearchOpen(!state.searchOpen);
-      });
-      closeSearchBtn.addEventListener('click', () => setSearchOpen(false));
-      searchBackdrop.addEventListener('click', () => setSearchOpen(false));
-
-      searchInput.addEventListener('input', (e) => {
-        const val = e.target.value;
-        clearSearchBtn.classList.toggle('hidden', val.length === 0);
-        renderSearchResults(val);
-      });
-      clearSearchBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        clearSearchBtn.classList.add('hidden');
-        renderSearchResults('');
-        searchInput.focus();
+      // Tecla Escape para cerrar overlays
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (state.searchOpen) setSearchOpen(false);
+          if (state.mobileDrawerOpen) setMobileDrawerOpen(false);
+        }
       });
 
-      // Ocultar ayuda táctil automáticamente tras 6 segundos
-      setTimeout(dismissTouchHint, 6000);
+      renderSearchResults('');
     }
 
     // =========================================================================
-    // 16. INICIALIZACIÓN DE ESCENA THREE.JS Y BUCLE DE RENDERIZADO
+    // 16. INICIALIZACIÓN DE ESCENA THREE.JS, INTERACCIÓN Y BUCLE DE RENDER
     // =========================================================================
     function initScene() {
       const container = document.getElementById('canvas-container');
       const isMobile = window.innerWidth < 768;
-      const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
 
       scene = new THREE.Scene();
       scene.fog = new THREE.FogExp2(0x0b101b, 0.0034);
 
-      camera = new THREE.PerspectiveCamera(aspect < 0.95 ? 48 : 42, aspect, 0.4, 460);
-      const initialPose = getResponsiveCameraPose(FLOOR_VIEWS['-1'].pos, FLOOR_VIEWS['-1'].target, false);
-      camera.position.copy(initialPose.pos);
+      camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.4, 460);
+      const initPose = getResponsiveCameraPose(FLOOR_VIEWS['-1'].pos, FLOOR_VIEWS['-1'].target, false);
+      camera.position.copy(initPose.pos);
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
@@ -2985,35 +3012,35 @@
       renderer.toneMappingExposure = 1.08;
       container.appendChild(renderer.domElement);
 
+      // OrbitControls con respaldo táctil automático
       if (typeof THREE.OrbitControls === 'function') {
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.dampingFactor = 0.08;
-        controls.rotateSpeed = isMobile ? 0.72 : 0.88;
-        controls.zoomSpeed = isMobile ? 0.9 : 1.0;
-        controls.panSpeed = 0.85;
-        controls.minDistance = 10;
+        controls.dampingFactor = 0.075;
+        controls.minDistance = 8;
         controls.maxDistance = 195;
         controls.maxPolarAngle = Math.PI * 0.495;
+        controls.rotateSpeed = isMobile ? 0.85 : 1.0;
         if (THREE.TOUCH) {
           controls.touches = {
             ONE: THREE.TOUCH.ROTATE,
             TWO: THREE.TOUCH.DOLLY_PAN
           };
         }
-        controls.target.copy(initialPose.target);
+        controls.target.copy(initPose.target);
         controls.update();
       } else {
         controls = new FallbackOrbitControls(camera, renderer.domElement);
-        controls.target.copy(initialPose.target);
+        controls.target.copy(initPose.target);
+        controls.update();
       }
 
       // Iluminación de estudio arquitectónico
-      const hemi = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.78);
-      hemi.position.set(0, 60, 0);
+      const hemi = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.76);
+      hemi.position.set(0, 65, 0);
       scene.add(hemi);
 
-      const sun = new THREE.DirectionalLight(0xfff7ed, 1.18);
+      const sun = new THREE.DirectionalLight(0xfff7ed, 1.15);
       sun.position.set(-48, 72, 42);
       sun.castShadow = true;
       const shadowRes = isMobile ? 1024 : 2048;
@@ -3021,14 +3048,14 @@
       sun.shadow.mapSize.height = shadowRes;
       sun.shadow.camera.near = 10;
       sun.shadow.camera.far = 210;
-      sun.shadow.camera.left = -64;
-      sun.shadow.camera.right = 54;
-      sun.shadow.camera.top = 48;
-      sun.shadow.camera.bottom = -48;
+      sun.shadow.camera.left = -62;
+      sun.shadow.camera.right = 62;
+      sun.shadow.camera.top = 52;
+      sun.shadow.camera.bottom = -52;
       sun.shadow.bias = -0.0006;
       scene.add(sun);
 
-      const fill = new THREE.DirectionalLight(0x7dd3fc, 0.45);
+      const fill = new THREE.DirectionalLight(0x7dd3fc, 0.44);
       fill.position.set(55, 34, -45);
       scene.add(fill);
 
@@ -3040,7 +3067,7 @@
       lightPulmon.position.set(BLDG_OFFSET_X + 47.0, 10.5, BLDG_OFFSET_Z + 7.2);
       scene.add(lightPulmon);
 
-      // Entorno urbano de Calle Perú
+      // Base urbana de Calle Perú + arbolado
       buildSiteBase();
 
       // Edificio de 7 niveles
@@ -3059,32 +3086,12 @@
         buildingRoot.add(grp);
       });
 
-      // Prismas 3D de Stands de Exposición
+      // Prismas 3D de stands de exposición
       buildStands();
 
-      // Raycasting táctil + mouse: solo seleccionables los stands del piso activo
+      // Raycasting táctil y de mouse solo sobre stands visibles del piso activo
       raycaster = new THREE.Raycaster();
       pointer = new THREE.Vector2();
-
-      const getVisibleStandHit = (clientX, clientY) => {
-        if (state.selectedLevel === -1) return null;
-        const rect = renderer.domElement.getBoundingClientRect();
-        pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-        raycaster.setFromCamera(pointer, camera);
-
-        const hits = raycaster.intersectObjects(standClickableMeshes, false);
-        return hits.find(h => {
-          const sId = h.object.userData.standId;
-          return standVisuals[sId] && standVisuals[sId].group.visible;
-        }) || null;
-      };
-
-      renderer.domElement.addEventListener('pointermove', (e) => {
-        if (e.pointerType === 'touch') return;
-        const hit = getVisibleStandHit(e.clientX, e.clientY);
-        container.classList.toggle('hover-stand', !!hit);
-      });
 
       renderer.domElement.addEventListener('pointerdown', (e) => {
         dismissTouchHint();
@@ -3099,73 +3106,80 @@
         state.camAnim = null;
       });
 
-      const handlePointerEnd = (e) => {
-        const wasMulti = state.wasMultiTouch || state.activePointers.size > 1;
-        state.activePointers.delete(e.pointerId);
-        if (state.activePointers.size === 0) {
-          state.wasMultiTouch = false;
+      renderer.domElement.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch' || state.selectedLevel === -1) {
+          container.classList.remove('hover-stand');
+          return;
         }
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(standClickableMeshes, false);
+        const hit = hits.find(h => h.object.userData.levelIndex === state.selectedLevel && levelGroups[state.selectedLevel].visible);
+        container.classList.toggle('hover-stand', Boolean(hit));
+      });
 
-        if (e.type !== 'pointerup' || wasMulti) return;
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const handlePointerEnd = (e) => {
+        state.activePointers.delete(e.pointerId);
+        if (state.wasMultiTouch) {
+          if (state.activePointers.size === 0) state.wasMultiTouch = false;
+          return;
+        }
+        if (e.button !== undefined && e.button !== 0 && e.pointerType !== 'touch') return;
 
-        // Tolerancia de movimiento más generosa para el dedo en pantallas táctiles
-        const maxTapDrift = e.pointerType === 'touch' ? 14 : 6;
         const dist = Math.hypot(e.clientX - state.pointerDownPos.x, e.clientY - state.pointerDownPos.y);
-        if (dist > maxTapDrift) return;
+        if (dist > 9 || state.selectedLevel === -1) return;
 
-        const visibleStandHit = getVisibleStandHit(e.clientX, e.clientY);
-        if (visibleStandHit) {
-          const sId = visibleStandHit.object.userData.standId;
-          if (state.selectedStandId === sId) {
-            selectFloor(state.selectedLevel, true);
-          } else {
-            selectStand(sId, true);
-          }
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(standClickableMeshes, false);
+        const hit = hits.find(h => {
+          const sid = h.object.userData.standId;
+          return sid && standVisuals[sid] && standVisuals[sid].group.visible;
+        });
+
+        if (hit) {
+          selectStand(hit.object.userData.standId, true);
         }
       };
 
       renderer.domElement.addEventListener('pointerup', handlePointerEnd);
-      renderer.domElement.addEventListener('pointercancel', handlePointerEnd);
-
-      const handleResize = () => {
-        const w = window.innerWidth;
-        const h = Math.max(window.innerHeight, 1);
-        const asp = w / h;
-        camera.fov = asp < 0.95 ? 48 : 42;
-        camera.aspect = asp;
-        camera.updateProjectionMatrix();
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, w < 768 ? 1.5 : 2));
-        renderer.setSize(w, h);
-      };
-
-      window.addEventListener('resize', handleResize);
-      window.addEventListener('orientationchange', () => {
-        setTimeout(() => {
-          handleResize();
-          resetCurrentCameraView();
-        }, 180);
+      renderer.domElement.addEventListener('pointercancel', (e) => {
+        state.activePointers.delete(e.pointerId);
+        if (state.activePointers.size === 0) state.wasMultiTouch = false;
       });
 
-      initUI();
-      initLabels();
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
       updateVisualMaterials();
+      initStandLabels();
+      initUI();
       animate();
     }
 
     function animate() {
       requestAnimationFrame(animate);
-      animClock += 0.04;
+      animClock += 0.016;
 
+      // Pulso luminoso sutil sobre el stand seleccionado
       if (state.selectedStandId && standVisuals[state.selectedStandId]) {
         const vis = standVisuals[state.selectedStandId];
         if (vis.group.visible) {
-          vis.bodyMat.emissiveIntensity = 0.62 + Math.sin(animClock * 1.4) * 0.16;
+          vis.bodyMat.emissiveIntensity = 0.58 + Math.sin(animClock * 3.4) * 0.16;
         }
       }
 
+      // Transición suave de cámara
       if (state.camAnim) {
-        state.camAnim.t = Math.min(1, state.camAnim.t + 0.052);
+        state.camAnim.t = Math.min(1, state.camAnim.t + 0.055);
         const ease = 1 - Math.pow(1 - state.camAnim.t, 3);
         camera.position.lerpVectors(state.camAnim.startPos, state.camAnim.endPos, ease);
         controls.target.lerpVectors(state.camAnim.startTarget, state.camAnim.endTarget, ease);
@@ -3174,19 +3188,19 @@
 
       controls.update();
       renderer.render(scene, camera);
-      projectLabels();
+      projectStandLabels();
     }
 
     window.onload = function () {
+      if (typeof THREE === 'undefined') {
+        document.body.innerHTML = '<div style="padding:32px;color:#e2e8f0;font-family:sans-serif;text-align:center">No se pudo cargar Three.js. Verificá tu conexión a internet y recargá la página.</div>';
+        return;
+      }
       try {
-        if (typeof THREE === 'undefined') {
-          document.body.innerHTML = '<div style="padding:40px;color:#fff">Error al cargar Three.js desde CDN. Verificá tu conexión a internet.</div>';
-          return;
-        }
         initScene();
       } catch (err) {
-        console.error('Error al inicializar la maqueta 3D:', err);
-        document.body.innerHTML = '<div style="padding:40px;color:#f87171;font-family:monospace">Error al inicializar la escena 3D: ' + String(err.message || err) + '</div>';
+        console.error('Error al iniciar el mapa 3D:', err);
+        document.body.innerHTML = '<div style="padding:32px;color:#fecaca;font-family:sans-serif;text-align:center">Ocurrió un error al inicializar el mapa 3D. Recargá la página para reintentar.</div>';
       }
     };
   })();
